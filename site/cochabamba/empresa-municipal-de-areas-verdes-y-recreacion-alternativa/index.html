@@ -12,19 +12,17 @@
       --accent: #2563eb; --accent-hover: #1d4ed8; --highlight: #f59e0b;
       --ok: #16a34a; --warn: #d97706; --err: #dc2626; --border: #e2e8f0;
       --dim: #cbd5e1; --ida: #2563eb; --vuelta: #9333ea;
+      --chrome-h: 5.75rem;
     }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: var(--bg); color: var(--text); line-height: 1.5;
-      display: flex; flex-direction: column;
     }
     .top-chrome {
-      flex-shrink: 0;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      z-index: 600;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 600;
+      background: var(--card); border-bottom: 1px solid var(--border);
     }
     .top-row {
       display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
@@ -51,16 +49,17 @@
     .toolbar button:hover { background: var(--accent-hover); }
     .toolbar button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
     .toolbar button.icon-btn { padding: 0.35rem 0.6rem; min-width: 2rem; }
+    .toolbar button.btn-validate {
+      background: #059669; border-color: #059669; font-weight: 600;
+      box-shadow: 0 2px 8px rgba(5,150,105,0.35);
+    }
+    .toolbar button.btn-validate:hover { background: #047857; }
     .progress-bar { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
     .map-workspace {
-      flex: 1;
+      position: fixed;
+      top: var(--chrome-h); left: 0; right: 0; bottom: 0;
       display: flex;
-      min-height: 0;
-      height: calc(100vh - 6.5rem);
-      max-height: calc(100vh - 6.5rem);
       background: var(--card);
-      border-bottom: 1px solid var(--border);
-      position: relative;
     }
     .sidebar-toggle {
       display: none;
@@ -90,8 +89,19 @@
     .map-sidebar-actions button:hover { background: #e2e8f0; }
     .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
     .vis-ref-group { border-bottom: 1px solid var(--border); }
-    .vis-ref-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; background: #fafbfc; cursor: pointer; }
-    .vis-ref-head input { margin: 0; }
+    .vis-ref-head {
+      display: flex; align-items: center; gap: 0.35rem;
+      padding: 0.4rem 0.65rem; font-size: 0.78rem; font-weight: 600;
+      background: #fafbfc; cursor: pointer; user-select: none;
+    }
+    .vis-ref-head:hover { background: #f1f5f9; }
+    .vis-ref-head input { margin: 0; flex-shrink: 0; }
+    .vis-chevron { font-size: 0.6rem; color: var(--muted); width: 0.75rem; transition: transform 0.15s; flex-shrink: 0; }
+    .vis-ref-head.expanded .vis-chevron { transform: rotate(90deg); }
+    .vis-ref-title { flex: 1; min-width: 0; }
+    .vis-ref-count { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
+    .vis-ref-body { overflow: hidden; }
+    .vis-ref-body.collapsed { display: none; }
     .vis-variant { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem 0.75rem 0.3rem 1.15rem; font-size: 0.76rem; cursor: pointer; border-left: 3px solid transparent; }
     .vis-variant:hover { background: #f8fafc; }
     .vis-variant.selected { background: #fffbeb; border-left-color: var(--highlight); }
@@ -107,8 +117,8 @@
       padding: 0.35rem 0.75rem; font-size: 0.78rem; color: var(--muted);
       border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0;
     }
-    .map-wrap { position: relative; flex: 1; min-height: 0; }
-    #overview-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-wrap { position: relative; flex: 1; min-height: 0; width: 100%; }
+    #overview-map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; z-index: 1; }
     .map-empty-hint {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       background: rgba(255,255,255,0.94); padding: 0.65rem 1rem; border-radius: 8px;
@@ -116,16 +126,51 @@
       box-shadow: 0 2px 12px rgba(0,0,0,0.12);
     }
     .dir-arrow-icon { background: none !important; border: none !important; font-size: 14px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 4px #fff; }
-    .validation-panel {
-      flex-shrink: 0;
-      max-width: 1200px; width: 100%; margin: 0 auto;
-      padding: 1.25rem 1rem 2rem;
+    .fab-validate {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 550;
+      font: inherit; font-size: 1rem; font-weight: 700;
+      padding: 0.85rem 1.35rem; border: none; border-radius: 999px;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(5,150,105,0.45);
+      display: flex; align-items: center; gap: 0.5rem;
     }
-    .validation-panel > h2 { margin: 0 0 1rem; font-size: 1.1rem; color: var(--text); }
+    .fab-validate:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(5,150,105,0.5); }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 800;
+      background: rgba(15,23,42,0.55); backdrop-filter: blur(2px);
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-panel {
+      background: var(--card); width: min(920px, 100%); max-height: 88vh;
+      border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #fff;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.1rem; flex: 1; }
+    .modal-close {
+      font: inherit; background: rgba(255,255,255,0.2); border: none;
+      color: #fff; width: 2rem; height: 2rem; border-radius: 8px;
+      cursor: pointer; font-size: 1.2rem; line-height: 1;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.35); }
+    .modal-body { overflow-y: auto; flex: 1; padding: 1rem 1.25rem 1.5rem; }
+    .modal-body > p.hint { margin: 0 0 1rem; font-size: 0.85rem; color: var(--muted); }
     .route-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
     .route-card.hidden { display: none; }
     .route-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.75rem 1rem; cursor: pointer; user-select: none; }
     .route-header:hover { background: #f8fafc; }
+    .route-validate-btn {
+      font: inherit; font-size: 0.78rem; font-weight: 600;
+      padding: 0.35rem 0.65rem; border-radius: 6px; border: none;
+      background: #059669; color: #fff; cursor: pointer;
+    }
+    .route-validate-btn:hover { background: #047857; }
     .route-badge { font-weight: 700; font-size: 1.1rem; color: var(--accent); min-width: 3rem; }
     .route-title { flex: 1; font-size: 0.95rem; }
     .route-meta { font-size: 0.8rem; color: var(--muted); }
@@ -147,17 +192,17 @@
     .validation-row button.active[data-status="reject"] { background: #fee2e2; border-color: var(--err); color: var(--err); }
     .validation textarea { width: 100%; min-height: 2.5rem; font: inherit; font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
     .stops-list { max-height: 180px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem; }
-    footer.app-footer { flex-shrink: 0; text-align: center; padding: 0.75rem; font-size: 0.75rem; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
     .status-ok { color: var(--ok); }
     .status-err { color: var(--err); }
     @media (max-width: 900px) {
-      .map-workspace { height: calc(100vh - 7rem); max-height: calc(100vh - 7rem); }
+      :root { --chrome-h: 6.5rem; }
       .sidebar-toggle { display: block; }
       .map-sidebar {
         position: absolute; left: 0; top: 0; bottom: 0;
         box-shadow: 4px 0 16px rgba(0,0,0,0.15);
       }
       .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+      .fab-validate { bottom: 1rem; right: 1rem; font-size: 0.9rem; padding: 0.7rem 1.1rem; }
     }
   </style>
 </head>
@@ -179,6 +224,7 @@
         <option value="Teleférico">Teleférico (2)</option>
       </select>
       <button type="button" class="secondary icon-btn" id="toggle-sidebar" title="Mostrar/ocultar panel de rutas">☰</button>
+      <button type="button" class="btn-validate" id="open-validation-toolbar">✓ Validar rutas</button>
       <button type="button" class="secondary" id="export-json">Exportar</button>
       <span class="progress-bar" id="progress">0 / 0 validadas</span>
     </div>
@@ -206,16 +252,24 @@
     </div>
   </div>
 
-  <section class="validation-panel">
-    <h2>Detalle y validación por ruta</h2>
-    <div id="routes-container"></div>
-  </section>
+  <button type="button" class="fab-validate" id="open-validation-fab" title="Abrir detalle y validación">
+    ✓ Validar rutas
+  </button>
 
-  <footer class="app-footer">
-    Generado por <a href="https://www.trufi-association.org/" target="_blank" rel="noopener">Trufi Association</a> · observaciones guardadas localmente
-  </footer>
+  <div class="modal-overlay" id="validation-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 id="modal-title">Detalle y validación por línea</h2>
+        <button type="button" class="modal-close" id="close-validation" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint">Revise cada variante, marque su estado y agregue observaciones. Use «Ver en mapa» para ubicarla.</p>
+        <div id="routes-container"></div>
+      </div>
+    </div>
+  </div>
 
-  <script id="report-data" type="application/json">{"slug":"empresa-municipal-de-areas-verdes-y-recreacion-alternativa","operator":"Empresa Municipal de Áreas Verdes y Recreación Alternativa","cityName":"cochabamba","generatedAt":"2026-05-30T19:13:11.079Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":0},"refGroups":[{"ref":"Teleférico","gtfsRouteId":"","routeColor":"888888","routeLongName":"Teleferico Teleférico","variants":[{"osmId":6925237,"ref":"Teleférico","name":"Teleferico Teleférico: Cristo de la Concordia → Parque de la Autonomía","from":"Cristo de la Concordia","to":"Parque de la Autonomía","description":"","tripHeadsign":"Parque de la Autonomía","routeType":"bus","gtfsRouteId":"","routeColor":"888888","stopCount":0,"stops":[],"coordinates":[[-66.1416801,-17.3885364],[-66.1415639,-17.3884622],[-66.141482,-17.3884103],[-66.1408644,-17.38805],[-66.1398564,-17.3874474],[-66.1396307,-17.3873207],[-66.1392144,-17.3871051],[-66.1380019,-17.3863831],[-66.1375645,-17.3861327],[-66.1371988,-17.3859011],[-66.1368198,-17.3856876],[-66.1360739,-17.3851971],[-66.135865,-17.3850846],[-66.1357091,-17.3850051]],"osmUrl":"https://www.openstreetmap.org/relation/6925237","status":"ok","errorMessage":"","fee":"yes","onDemand":"","directionLabel":"ida"},{"osmId":6925236,"ref":"Teleférico","name":"Teleferico Teleférico: Parque de la Autonomía → Cristo de la Concordia","from":"Parque de la Autonomía","to":"Cristo de la Concordia","description":"","tripHeadsign":"Cristo de la Concordia","routeType":"bus","gtfsRouteId":"","routeColor":"888888","stopCount":0,"stops":[],"coordinates":[[-66.1416801,-17.3885364],[-66.1415639,-17.3884622],[-66.141482,-17.3884103],[-66.1408644,-17.38805],[-66.1398564,-17.3874474],[-66.1396307,-17.3873207],[-66.1392144,-17.3871051],[-66.1380019,-17.3863831],[-66.1375645,-17.3861327],[-66.1371988,-17.3859011],[-66.1368198,-17.3856876],[-66.1360739,-17.3851971],[-66.135865,-17.3850846],[-66.1357091,-17.3850051]],"osmUrl":"https://www.openstreetmap.org/relation/6925236","status":"ok","errorMessage":"","fee":"yes","onDemand":"","directionLabel":"vuelta"}]}]}</script>
+  <script id="report-data" type="application/json">{"slug":"empresa-municipal-de-areas-verdes-y-recreacion-alternativa","operator":"Empresa Municipal de Áreas Verdes y Recreación Alternativa","cityName":"cochabamba","generatedAt":"2026-05-30T19:25:58.978Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":0},"refGroups":[{"ref":"Teleférico","gtfsRouteId":"","routeColor":"888888","routeLongName":"Teleferico Teleférico","variants":[{"osmId":6925237,"ref":"Teleférico","name":"Teleferico Teleférico: Cristo de la Concordia → Parque de la Autonomía","from":"Cristo de la Concordia","to":"Parque de la Autonomía","description":"","tripHeadsign":"Parque de la Autonomía","routeType":"bus","gtfsRouteId":"","routeColor":"888888","stopCount":0,"stops":[],"coordinates":[[-66.1416801,-17.3885364],[-66.1415639,-17.3884622],[-66.141482,-17.3884103],[-66.1408644,-17.38805],[-66.1398564,-17.3874474],[-66.1396307,-17.3873207],[-66.1392144,-17.3871051],[-66.1380019,-17.3863831],[-66.1375645,-17.3861327],[-66.1371988,-17.3859011],[-66.1368198,-17.3856876],[-66.1360739,-17.3851971],[-66.135865,-17.3850846],[-66.1357091,-17.3850051]],"osmUrl":"https://www.openstreetmap.org/relation/6925237","status":"ok","errorMessage":"","fee":"yes","onDemand":"","directionLabel":"ida"},{"osmId":6925236,"ref":"Teleférico","name":"Teleferico Teleférico: Parque de la Autonomía → Cristo de la Concordia","from":"Parque de la Autonomía","to":"Cristo de la Concordia","description":"","tripHeadsign":"Cristo de la Concordia","routeType":"bus","gtfsRouteId":"","routeColor":"888888","stopCount":0,"stops":[],"coordinates":[[-66.1416801,-17.3885364],[-66.1415639,-17.3884622],[-66.141482,-17.3884103],[-66.1408644,-17.38805],[-66.1398564,-17.3874474],[-66.1396307,-17.3873207],[-66.1392144,-17.3871051],[-66.1380019,-17.3863831],[-66.1375645,-17.3861327],[-66.1371988,-17.3859011],[-66.1368198,-17.3856876],[-66.1360739,-17.3851971],[-66.135865,-17.3850846],[-66.1357091,-17.3850051]],"osmUrl":"https://www.openstreetmap.org/relation/6925236","status":"ok","errorMessage":"","fee":"yes","onDemand":"","directionLabel":"vuelta"}]}]}</script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
 (function () {
@@ -418,12 +472,26 @@
 
     var refHead = document.createElement('div');
     refHead.className = 'vis-ref-head';
+    var chevron = document.createElement('span');
+    chevron.className = 'vis-chevron';
+    chevron.textContent = '▶';
+    refHead.appendChild(chevron);
     var refCb = document.createElement('input');
     refCb.type = 'checkbox';
     refCb.title = 'Mostrar/ocultar línea ' + group.ref;
     refHead.appendChild(refCb);
-    refHead.appendChild(document.createTextNode(' Línea ' + group.ref + ' (' + group.variants.length + ')'));
+    var titleSpan = document.createElement('span');
+    titleSpan.className = 'vis-ref-title';
+    titleSpan.textContent = 'Línea ' + group.ref;
+    refHead.appendChild(titleSpan);
+    var countSpan = document.createElement('span');
+    countSpan.className = 'vis-ref-count';
+    countSpan.textContent = '(' + group.variants.length + ')';
+    refHead.appendChild(countSpan);
     refBlock.appendChild(refHead);
+
+    var refBody = document.createElement('div');
+    refBody.className = 'vis-ref-body collapsed';
 
     group.variants.forEach(function (v) {
       if (!variantLayers[v.osmId]) return;
@@ -445,9 +513,10 @@
 
       row.appendChild(cb);
       row.appendChild(text);
-      refBlock.appendChild(row);
+      refBody.appendChild(row);
 
-      cb.addEventListener('change', function () {
+      cb.addEventListener('change', function (e) {
+        e.stopPropagation();
         setVariantVisible(v.osmId, cb.checked);
         updateRefCheckbox(refCb, group);
       });
@@ -458,15 +527,19 @@
       });
     });
 
+    refBlock.appendChild(refBody);
+    refCb.addEventListener('click', function (e) { e.stopPropagation(); });
     refCb.addEventListener('change', function () {
       group.variants.forEach(function (v) {
         if (variantLayers[v.osmId]) setVariantVisible(v.osmId, refCb.checked);
       });
-      refBlock.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
+      refBody.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
     });
 
     refHead.addEventListener('click', function (e) {
-      if (e.target !== refCb) { refCb.checked = !refCb.checked; refCb.dispatchEvent(new Event('change')); }
+      if (e.target === refCb) return;
+      refBody.classList.toggle('collapsed');
+      refHead.classList.toggle('expanded', !refBody.classList.contains('collapsed'));
     });
 
     visList.appendChild(refBlock);
@@ -522,8 +595,17 @@
     header.innerHTML =
       '<span class="route-badge">' + esc(group.ref) + '</span>' +
       '<span class="route-title">' + esc(group.routeLongName || group.ref) + '</span>' +
-      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>';
+      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>' +
+      '<button type="button" class="route-validate-btn">Validar línea ' + esc(group.ref) + '</button>';
     card.appendChild(header);
+
+    header.querySelector('.route-validate-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      card.classList.add('open');
+      if (!routeMaps[group.ref]) initRefMap(group, card.querySelector('.route-map'));
+      openValidationModal();
+      setTimeout(function () { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+    });
 
     var body = document.createElement('div');
     body.className = 'route-body';
@@ -591,9 +673,9 @@
       block.appendChild(valDiv);
       block.querySelector('.show-on-map').addEventListener('click', function (e) {
         e.preventDefault();
+        closeValidationModal();
         setVariantVisible(v.osmId, true);
         selectVariant(v.osmId);
-        document.getElementById('overview-map').scrollIntoView({ behavior: 'smooth' });
       });
 
       variantsCol.appendChild(block);
@@ -655,12 +737,14 @@
       var show = !refFilter || ref === refFilter;
       if (show && q) {
         var any = false;
+        var body = rg.querySelector('.vis-ref-body');
         rg.querySelectorAll('.vis-variant').forEach(function (row) {
           var match = row.dataset.search.indexOf(q) >= 0;
           row.style.display = match ? '' : 'none';
           if (match) any = true;
         });
         rg.style.display = any ? '' : 'none';
+        if (any && body) { body.classList.remove('collapsed'); rg.querySelector('.vis-ref-head').classList.add('expanded'); }
       } else {
         rg.style.display = show ? '' : 'none';
         rg.querySelectorAll('.vis-variant').forEach(function (row) { row.style.display = ''; });
@@ -700,11 +784,31 @@
     URL.revokeObjectURL(a.href);
   });
 
+  function openValidationModal() {
+    document.getElementById('validation-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeValidationModal() {
+    document.getElementById('validation-modal').classList.remove('open');
+    document.body.style.overflow = 'hidden';
+    invalidateMap();
+  }
+
+  document.getElementById('open-validation-fab').addEventListener('click', openValidationModal);
+  document.getElementById('open-validation-toolbar').addEventListener('click', openValidationModal);
+  document.getElementById('close-validation').addEventListener('click', closeValidationModal);
+  document.getElementById('validation-modal').addEventListener('click', function (e) {
+    if (e.target.id === 'validation-modal') closeValidationModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeValidationModal();
+  });
+
   refreshAllStyles();
   updateProgress();
 
   function invalidateMap() {
-    setTimeout(function () { overviewMap.invalidateSize(); }, 50);
+    setTimeout(function () { overviewMap.invalidateSize(); }, 80);
   }
 
   function toggleSidebar() {
@@ -716,7 +820,8 @@
   document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
   document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
   window.addEventListener('resize', invalidateMap);
-  invalidateMap();
+  setTimeout(invalidateMap, 150);
+  setTimeout(invalidateMap, 500);
 })();
   </script>
 </body>

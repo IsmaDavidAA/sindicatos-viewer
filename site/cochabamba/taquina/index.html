@@ -12,19 +12,17 @@
       --accent: #2563eb; --accent-hover: #1d4ed8; --highlight: #f59e0b;
       --ok: #16a34a; --warn: #d97706; --err: #dc2626; --border: #e2e8f0;
       --dim: #cbd5e1; --ida: #2563eb; --vuelta: #9333ea;
+      --chrome-h: 5.75rem;
     }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: var(--bg); color: var(--text); line-height: 1.5;
-      display: flex; flex-direction: column;
     }
     .top-chrome {
-      flex-shrink: 0;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      z-index: 600;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 600;
+      background: var(--card); border-bottom: 1px solid var(--border);
     }
     .top-row {
       display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
@@ -51,16 +49,17 @@
     .toolbar button:hover { background: var(--accent-hover); }
     .toolbar button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
     .toolbar button.icon-btn { padding: 0.35rem 0.6rem; min-width: 2rem; }
+    .toolbar button.btn-validate {
+      background: #059669; border-color: #059669; font-weight: 600;
+      box-shadow: 0 2px 8px rgba(5,150,105,0.35);
+    }
+    .toolbar button.btn-validate:hover { background: #047857; }
     .progress-bar { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
     .map-workspace {
-      flex: 1;
+      position: fixed;
+      top: var(--chrome-h); left: 0; right: 0; bottom: 0;
       display: flex;
-      min-height: 0;
-      height: calc(100vh - 6.5rem);
-      max-height: calc(100vh - 6.5rem);
       background: var(--card);
-      border-bottom: 1px solid var(--border);
-      position: relative;
     }
     .sidebar-toggle {
       display: none;
@@ -90,8 +89,19 @@
     .map-sidebar-actions button:hover { background: #e2e8f0; }
     .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
     .vis-ref-group { border-bottom: 1px solid var(--border); }
-    .vis-ref-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; background: #fafbfc; cursor: pointer; }
-    .vis-ref-head input { margin: 0; }
+    .vis-ref-head {
+      display: flex; align-items: center; gap: 0.35rem;
+      padding: 0.4rem 0.65rem; font-size: 0.78rem; font-weight: 600;
+      background: #fafbfc; cursor: pointer; user-select: none;
+    }
+    .vis-ref-head:hover { background: #f1f5f9; }
+    .vis-ref-head input { margin: 0; flex-shrink: 0; }
+    .vis-chevron { font-size: 0.6rem; color: var(--muted); width: 0.75rem; transition: transform 0.15s; flex-shrink: 0; }
+    .vis-ref-head.expanded .vis-chevron { transform: rotate(90deg); }
+    .vis-ref-title { flex: 1; min-width: 0; }
+    .vis-ref-count { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
+    .vis-ref-body { overflow: hidden; }
+    .vis-ref-body.collapsed { display: none; }
     .vis-variant { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem 0.75rem 0.3rem 1.15rem; font-size: 0.76rem; cursor: pointer; border-left: 3px solid transparent; }
     .vis-variant:hover { background: #f8fafc; }
     .vis-variant.selected { background: #fffbeb; border-left-color: var(--highlight); }
@@ -107,8 +117,8 @@
       padding: 0.35rem 0.75rem; font-size: 0.78rem; color: var(--muted);
       border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0;
     }
-    .map-wrap { position: relative; flex: 1; min-height: 0; }
-    #overview-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-wrap { position: relative; flex: 1; min-height: 0; width: 100%; }
+    #overview-map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; z-index: 1; }
     .map-empty-hint {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       background: rgba(255,255,255,0.94); padding: 0.65rem 1rem; border-radius: 8px;
@@ -116,16 +126,51 @@
       box-shadow: 0 2px 12px rgba(0,0,0,0.12);
     }
     .dir-arrow-icon { background: none !important; border: none !important; font-size: 14px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 4px #fff; }
-    .validation-panel {
-      flex-shrink: 0;
-      max-width: 1200px; width: 100%; margin: 0 auto;
-      padding: 1.25rem 1rem 2rem;
+    .fab-validate {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 550;
+      font: inherit; font-size: 1rem; font-weight: 700;
+      padding: 0.85rem 1.35rem; border: none; border-radius: 999px;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(5,150,105,0.45);
+      display: flex; align-items: center; gap: 0.5rem;
     }
-    .validation-panel > h2 { margin: 0 0 1rem; font-size: 1.1rem; color: var(--text); }
+    .fab-validate:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(5,150,105,0.5); }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 800;
+      background: rgba(15,23,42,0.55); backdrop-filter: blur(2px);
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-panel {
+      background: var(--card); width: min(920px, 100%); max-height: 88vh;
+      border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #fff;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.1rem; flex: 1; }
+    .modal-close {
+      font: inherit; background: rgba(255,255,255,0.2); border: none;
+      color: #fff; width: 2rem; height: 2rem; border-radius: 8px;
+      cursor: pointer; font-size: 1.2rem; line-height: 1;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.35); }
+    .modal-body { overflow-y: auto; flex: 1; padding: 1rem 1.25rem 1.5rem; }
+    .modal-body > p.hint { margin: 0 0 1rem; font-size: 0.85rem; color: var(--muted); }
     .route-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
     .route-card.hidden { display: none; }
     .route-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.75rem 1rem; cursor: pointer; user-select: none; }
     .route-header:hover { background: #f8fafc; }
+    .route-validate-btn {
+      font: inherit; font-size: 0.78rem; font-weight: 600;
+      padding: 0.35rem 0.65rem; border-radius: 6px; border: none;
+      background: #059669; color: #fff; cursor: pointer;
+    }
+    .route-validate-btn:hover { background: #047857; }
     .route-badge { font-weight: 700; font-size: 1.1rem; color: var(--accent); min-width: 3rem; }
     .route-title { flex: 1; font-size: 0.95rem; }
     .route-meta { font-size: 0.8rem; color: var(--muted); }
@@ -147,17 +192,17 @@
     .validation-row button.active[data-status="reject"] { background: #fee2e2; border-color: var(--err); color: var(--err); }
     .validation textarea { width: 100%; min-height: 2.5rem; font: inherit; font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
     .stops-list { max-height: 180px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem; }
-    footer.app-footer { flex-shrink: 0; text-align: center; padding: 0.75rem; font-size: 0.75rem; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
     .status-ok { color: var(--ok); }
     .status-err { color: var(--err); }
     @media (max-width: 900px) {
-      .map-workspace { height: calc(100vh - 7rem); max-height: calc(100vh - 7rem); }
+      :root { --chrome-h: 6.5rem; }
       .sidebar-toggle { display: block; }
       .map-sidebar {
         position: absolute; left: 0; top: 0; bottom: 0;
         box-shadow: 4px 0 16px rgba(0,0,0,0.15);
       }
       .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+      .fab-validate { bottom: 1rem; right: 1rem; font-size: 0.9rem; padding: 0.7rem 1.1rem; }
     }
   </style>
 </head>
@@ -179,6 +224,7 @@
         <option value="Taquiña">Taquiña (2)</option>
       </select>
       <button type="button" class="secondary icon-btn" id="toggle-sidebar" title="Mostrar/ocultar panel de rutas">☰</button>
+      <button type="button" class="btn-validate" id="open-validation-toolbar">✓ Validar rutas</button>
       <button type="button" class="secondary" id="export-json">Exportar</button>
       <span class="progress-bar" id="progress">0 / 0 validadas</span>
     </div>
@@ -206,16 +252,24 @@
     </div>
   </div>
 
-  <section class="validation-panel">
-    <h2>Detalle y validación por ruta</h2>
-    <div id="routes-container"></div>
-  </section>
+  <button type="button" class="fab-validate" id="open-validation-fab" title="Abrir detalle y validación">
+    ✓ Validar rutas
+  </button>
 
-  <footer class="app-footer">
-    Generado por <a href="https://www.trufi-association.org/" target="_blank" rel="noopener">Trufi Association</a> · observaciones guardadas localmente
-  </footer>
+  <div class="modal-overlay" id="validation-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 id="modal-title">Detalle y validación por línea</h2>
+        <button type="button" class="modal-close" id="close-validation" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint">Revise cada variante, marque su estado y agregue observaciones. Use «Ver en mapa» para ubicarla.</p>
+        <div id="routes-container"></div>
+      </div>
+    </div>
+  </div>
 
-  <script id="report-data" type="application/json">{"slug":"taquina","operator":"Taquiña","cityName":"cochabamba","generatedAt":"2026-05-30T19:13:11.079Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":61},"refGroups":[{"ref":"Taquiña","gtfsRouteId":44,"routeColor":"888888","routeLongName":"Trufi Taquiña","variants":[{"osmId":9386184,"ref":"Taquiña","name":"Trufi Taquiña: Cruce Taquiña → Planta Taquiña","from":"Cruce Taquiña","to":"Planta Taquiña","description":"","tripHeadsign":"Planta Taquiña","routeType":"bus","gtfsRouteId":44,"routeColor":"888888","stopCount":31,"stops":[{"id":11535045440,"name":"Avenida Simón López","lat":-17.3546007,"lon":-66.1875161},{"id":7814223044,"name":"Avenida Centenario","lat":-17.3540242,"lon":-66.1873775},{"id":11486083223,"name":"Avenida Centenario","lat":-17.3519658,"lon":-66.186065},{"id":601871700,"name":"Avenida Centenario","lat":-17.3506681,"lon":-66.1848103},{"id":5290354590,"name":"Rotonda Circunvalación Beijing y Centenario y Avenida Centenario","lat":-17.3505203,"lon":-66.1845282},{"id":9049566118,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.350445,"lon":-66.1843972},{"id":9343671210,"name":"Avenida Centenario","lat":-17.35034,"lon":-66.1843539},{"id":2318865845,"name":"Avenida Centenario","lat":-17.3500126,"lon":-66.1841563},{"id":2318865814,"name":"Avenida Centenario","lat":-17.3482265,"lon":-66.1830568},{"id":11813320201,"name":"Avenida Centenario","lat":-17.3478156,"lon":-66.1829083},{"id":2318865756,"name":"Avenida Centenario","lat":-17.3466748,"lon":-66.1830371},{"id":2318865729,"name":"Avenida Centenario","lat":-17.3450696,"lon":-66.1832729},{"id":2318865713,"name":"Avenida Centenario","lat":-17.3440623,"lon":-66.1833137},{"id":2318865693,"name":"Avenida Centenario","lat":-17.3429886,"lon":-66.1832772},{"id":3281400409,"name":"Avenida Centenario","lat":-17.3420199,"lon":-66.1833169},{"id":1583335234,"name":"Avenida Centenario","lat":-17.3409587,"lon":-66.1835303},{"id":1583335462,"name":"Avenida Centenario","lat":-17.3385004,"lon":-66.1832061},{"id":7245757843,"name":"Avenida Centenario","lat":-17.3371529,"lon":-66.1833119},{"id":1583335328,"name":"Avenida Centenario","lat":-17.3365805,"lon":-66.1834593},{"id":3281400287,"name":"Avenida Centenario","lat":-17.3348212,"lon":-66.1836277},{"id":1583335321,"name":"Avenida Centenario","lat":-17.3343349,"lon":-66.1835533},{"id":1583335297,"name":"Avenida Centenario","lat":-17.3338547,"lon":-66.1835333},{"id":1583335270,"name":"Avenida Centenario","lat":-17.3327959,"lon":-66.1836193},{"id":1583335362,"name":"Avenida Centenario","lat":-17.3324792,"lon":-66.1833671},{"id":3281400275,"name":"Avenida Centenario","lat":-17.3321778,"lon":-66.1831079},{"id":3281400274,"name":"Avenida Centenario","lat":-17.3317824,"lon":-66.1830757},{"id":3281400271,"name":"Avenida Centenario","lat":-17.3313978,"lon":-66.1829246},{"id":10074224270,"name":"Avenida Centenario","lat":-17.3311127,"lon":-66.1830527},{"id":4237666301,"name":"Avenida Centenario","lat":-17.3303064,"lon":-66.1845891},{"id":4237671848,"name":"Avenida Centenario","lat":-17.3292236,"lon":-66.1851916},{"id":1583335363,"name":"Avenida Centenario","lat":-17.3286237,"lon":-66.185049}],"coordinates":[[-66.1875161,-17.3546007],[-66.1874929,-17.3545067],[-66.1874286,-17.3542617],[-66.1873663,-17.3541458],[-66.1873775,-17.3540242],[-66.1872937,-17.3538857],[-66.1871481,-17.3536482],[-66.1861434,-17.3520867],[-66.1861017,-17.3520162],[-66.186065,-17.3519658],[-66.1858522,-17.3516733],[-66.1857698,-17.3515687],[-66.1856447,-17.3514444],[-66.1848103,-17.3506681],[-66.1847541,-17.3506389],[-66.1846645,-17.3505718],[-66.184614,-17.3505451],[-66.1845282,-17.3505203],[-66.1845006,-17.3505191],[-66.1844682,-17.3505106],[-66.184439,-17.3504947],[-66.1844148,-17.3504723],[-66.1843972,-17.350445],[-66.1843872,-17.3504143],[-66.1843854,-17.3503822],[-66.1843887,-17.3503619],[-66.1843539,-17.35034],[-66.1843332,-17.3503167],[-66.1842927,-17.35025],[-66.1842576,-17.350188],[-66.1842669,-17.3501375],[-66.1841563,-17.3500126],[-66.1840928,-17.3499413],[-66.1840229,-17.3498411],[-66.1836296,-17.3491889],[-66.1830568,-17.3482265],[-66.1829677,-17.348053],[-66.1829276,-17.3479493],[-66.1829118,-17.3478907],[-66.1829083,-17.3478156],[-66.1829112,-17.3476633],[-66.1829465,-17.3473787],[-66.1830077,-17.3468884],[-66.1830306,-17.346728],[-66.1830371,-17.3466748],[-66.1830464,-17.3466109],[-66.1831552,-17.3458667],[-66.1832556,-17.345172],[-66.1832729,-17.3450696],[-66.1833221,-17.3446344],[-66.1833331,-17.3444964],[-66.1833463,-17.3443677],[-66.1833137,-17.3440623],[-66.1833156,-17.343814],[-66.1833281,-17.3435946],[-66.1833205,-17.3433258],[-66.1833032,-17.3432124],[-66.1832772,-17.3429886],[-66.183266,-17.3428618],[-66.1832708,-17.3427804],[-66.1833065,-17.3424033],[-66.1833169,-17.3420199],[-66.1833683,-17.3417525],[-66.1834304,-17.3414975],[-66.1834724,-17.3413503],[-66.1835184,-17.3411215],[-66.1835303,-17.3409587],[-66.1834677,-17.3404596],[-66.183458,-17.3404028],[-66.1832851,-17.3393115],[-66.1832061,-17.3385004],[-66.1831954,-17.3382791],[-66.1832054,-17.3381585],[-66.1832994,-17.3372232],[-66.1833119,-17.3371529],[-66.1833375,-17.3370094],[-66.183413,-17.3367728],[-66.1834218,-17.3367346],[-66.1834507,-17.3366449],[-66.1834593,-17.3365805],[-66.1834133,-17.3356584],[-66.1834663,-17.3353881],[-66.1835007,-17.335272],[-66.1836277,-17.3348212],[-66.1836415,-17.3347235],[-66.183636,-17.3345969],[-66.1836096,-17.3344892],[-66.1835533,-17.3343349],[-66.1835281,-17.3342243],[-66.1835233,-17.3341896],[-66.1835095,-17.3340884],[-66.1835169,-17.3339372],[-66.1835333,-17.3338547],[-66.1835695,-17.3336565],[-66.1836183,-17.3331559],[-66.183632,-17.3329838],[-66.1836193,-17.3327959],[-66.1835926,-17.3327114],[-66.1835388,-17.3326268],[-66.1834741,-17.332554],[-66.1833671,-17.3324792],[-66.1832869,-17.3324382],[-66.1832092,-17.3323851],[-66.1831627,-17.3323336],[-66.1831293,-17.3322725],[-66.1831079,-17.3321778],[-66.1831058,-17.3320973],[-66.183115,-17.3320348],[-66.1831042,-17.3318766],[-66.1830757,-17.3317824],[-66.1830397,-17.3317022],[-66.1829987,-17.3316237],[-66.1829674,-17.3315536],[-66.1829387,-17.3314641],[-66.1829246,-17.3313978],[-66.1829215,-17.3313204],[-66.1829294,-17.3312364],[-66.18296,-17.3311833],[-66.1830527,-17.3311127],[-66.1831582,-17.3310401],[-66.1843941,-17.3304601],[-66.1845065,-17.3303779],[-66.1845891,-17.3303064],[-66.1848064,-17.3300006],[-66.1849528,-17.3298393],[-66.1850234,-17.3297418],[-66.1850432,-17.3296638],[-66.1851916,-17.3292236],[-66.1852352,-17.3290366],[-66.1852277,-17.3289512],[-66.1851918,-17.3288119],[-66.1851334,-17.3286933],[-66.185049,-17.3286237]],"osmUrl":"https://www.openstreetmap.org/relation/9386184","status":"ok","errorMessage":"","fee":"yes","onDemand":"yes","directionLabel":"ida","directionId":1},{"osmId":10789860,"ref":"Taquiña","name":"Trufi Taquiña: Planta Taquiña → Cruce Taquiña","from":"Planta Taquiña","to":"Cruce Taquiña","description":"","tripHeadsign":"Cruce Taquiña","routeType":"bus","gtfsRouteId":44,"routeColor":"888888","stopCount":30,"stops":[{"id":1583335363,"name":"Avenida Centenario","lat":-17.3286237,"lon":-66.185049},{"id":1583335288,"name":"Avenida Centenario","lat":-17.3290366,"lon":-66.1852352},{"id":4237666296,"name":"Avenida Centenario","lat":-17.3300006,"lon":-66.1848064},{"id":8762265495,"name":"Avenida Centenario","lat":-17.3310401,"lon":-66.1831582},{"id":3281400271,"name":"Avenida Centenario","lat":-17.3313978,"lon":-66.1829246},{"id":1583335394,"name":"Avenida Centenario","lat":-17.3317022,"lon":-66.1830397},{"id":3281400275,"name":"Avenida Centenario","lat":-17.3321778,"lon":-66.1831079},{"id":3281400278,"name":"Avenida Centenario","lat":-17.3324382,"lon":-66.1832869},{"id":1583335270,"name":"Avenida Centenario","lat":-17.3327959,"lon":-66.1836193},{"id":1583335297,"name":"Avenida Centenario","lat":-17.3338547,"lon":-66.1835333},{"id":1583335321,"name":"Avenida Centenario","lat":-17.3343349,"lon":-66.1835533},{"id":3281400287,"name":"Avenida Centenario","lat":-17.3348212,"lon":-66.1836277},{"id":2087373751,"name":"Avenida Centenario","lat":-17.3366449,"lon":-66.1834507},{"id":7245757843,"name":"Avenida Centenario","lat":-17.3371529,"lon":-66.1833119},{"id":2318865643,"name":"Avenida Centenario","lat":-17.3393115,"lon":-66.1832851},{"id":1583335330,"name":"Avenida Centenario","lat":-17.3411215,"lon":-66.1835184},{"id":1583335267,"name":"Avenida Centenario","lat":-17.3424033,"lon":-66.1833065},{"id":1583335284,"name":"Avenida Centenario","lat":-17.3432124,"lon":-66.1833032},{"id":2318865718,"name":"Avenida Centenario","lat":-17.3443677,"lon":-66.1833463},{"id":2318865732,"name":"Avenida Centenario","lat":-17.345172,"lon":-66.1832556},{"id":2318865762,"name":"Avenida Centenario","lat":-17.3468884,"lon":-66.1830077},{"id":1583335499,"name":"Avenida Centenario","lat":-17.3478907,"lon":-66.1829118},{"id":1583335179,"name":"Avenida Centenario","lat":-17.3498411,"lon":-66.1840229},{"id":2368317080,"name":"Avenida Centenario","lat":-17.3501513,"lon":-66.1843085},{"id":9819008046,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.3502664,"lon":-66.1845506},{"id":11486083230,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.3503376,"lon":-66.1846434},{"id":9049566109,"name":"Avenida Centenario","lat":-17.350537,"lon":-66.1847036},{"id":3279659560,"name":"Avenida Centenario","lat":-17.3515687,"lon":-66.1857698},{"id":9049626817,"name":"Avenida Centenario","lat":-17.3536482,"lon":-66.1871481},{"id":851595310,"name":"Avenida Simón López y Avenida Centenario","lat":-17.3544767,"lon":-66.1876781}],"coordinates":[[-66.185049,-17.3286237],[-66.1851334,-17.3286933],[-66.1851918,-17.3288119],[-66.1852277,-17.3289512],[-66.1852352,-17.3290366],[-66.1851916,-17.3292236],[-66.1850432,-17.3296638],[-66.1850234,-17.3297418],[-66.1849528,-17.3298393],[-66.1848064,-17.3300006],[-66.1845891,-17.3303064],[-66.1845065,-17.3303779],[-66.1843941,-17.3304601],[-66.1831582,-17.3310401],[-66.1830527,-17.3311127],[-66.18296,-17.3311833],[-66.1829294,-17.3312364],[-66.1829215,-17.3313204],[-66.1829246,-17.3313978],[-66.1829387,-17.3314641],[-66.1829674,-17.3315536],[-66.1829987,-17.3316237],[-66.1830397,-17.3317022],[-66.1830757,-17.3317824],[-66.1831042,-17.3318766],[-66.183115,-17.3320348],[-66.1831058,-17.3320973],[-66.1831079,-17.3321778],[-66.1831293,-17.3322725],[-66.1831627,-17.3323336],[-66.1832092,-17.3323851],[-66.1832869,-17.3324382],[-66.1833671,-17.3324792],[-66.1834741,-17.332554],[-66.1835388,-17.3326268],[-66.1835926,-17.3327114],[-66.1836193,-17.3327959],[-66.183632,-17.3329838],[-66.1836183,-17.3331559],[-66.1835695,-17.3336565],[-66.1835333,-17.3338547],[-66.1835169,-17.3339372],[-66.1835095,-17.3340884],[-66.1835233,-17.3341896],[-66.1835281,-17.3342243],[-66.1835533,-17.3343349],[-66.1836096,-17.3344892],[-66.183636,-17.3345969],[-66.1836415,-17.3347235],[-66.1836277,-17.3348212],[-66.1835007,-17.335272],[-66.1834663,-17.3353881],[-66.1834133,-17.3356584],[-66.1834593,-17.3365805],[-66.1834507,-17.3366449],[-66.1834218,-17.3367346],[-66.183413,-17.3367728],[-66.1833375,-17.3370094],[-66.1833119,-17.3371529],[-66.1832994,-17.3372232],[-66.1832054,-17.3381585],[-66.1831954,-17.3382791],[-66.1832061,-17.3385004],[-66.1832851,-17.3393115],[-66.183458,-17.3404028],[-66.1834677,-17.3404596],[-66.1835303,-17.3409587],[-66.1835184,-17.3411215],[-66.1834724,-17.3413503],[-66.1834304,-17.3414975],[-66.1833683,-17.3417525],[-66.1833169,-17.3420199],[-66.1833065,-17.3424033],[-66.1832708,-17.3427804],[-66.183266,-17.3428618],[-66.1832772,-17.3429886],[-66.1833032,-17.3432124],[-66.1833205,-17.3433258],[-66.1833281,-17.3435946],[-66.1833156,-17.343814],[-66.1833137,-17.3440623],[-66.1833463,-17.3443677],[-66.1833331,-17.3444964],[-66.1833221,-17.3446344],[-66.1832729,-17.3450696],[-66.1832556,-17.345172],[-66.1831552,-17.3458667],[-66.1830464,-17.3466109],[-66.1830371,-17.3466748],[-66.1830306,-17.346728],[-66.1830077,-17.3468884],[-66.1829465,-17.3473787],[-66.1829112,-17.3476633],[-66.1829083,-17.3478156],[-66.1829118,-17.3478907],[-66.1829276,-17.3479493],[-66.1829677,-17.348053],[-66.1830568,-17.3482265],[-66.1836296,-17.3491889],[-66.1840229,-17.3498411],[-66.1840928,-17.3499413],[-66.1841563,-17.3500126],[-66.1842669,-17.3501375],[-66.1843085,-17.3501513],[-66.1843773,-17.3502007],[-66.1844345,-17.3502214],[-66.1845064,-17.3502635],[-66.1845269,-17.350263],[-66.1845506,-17.3502664],[-66.1845742,-17.3502737],[-66.1845987,-17.350287],[-66.1846268,-17.3503096],[-66.1846434,-17.3503376],[-66.1846538,-17.3503746],[-66.184655,-17.3503943],[-66.1846496,-17.3504322],[-66.1846759,-17.3504945],[-66.1847036,-17.350537],[-66.1847735,-17.3506081],[-66.1848103,-17.3506681],[-66.1856447,-17.3514444],[-66.1857698,-17.3515687],[-66.1858522,-17.3516733],[-66.186065,-17.3519658],[-66.1861017,-17.3520162],[-66.1861434,-17.3520867],[-66.1871481,-17.3536482],[-66.1872937,-17.3538857],[-66.1873775,-17.3540242],[-66.1876269,-17.3543984],[-66.187654,-17.3544399],[-66.1876781,-17.3544767]],"osmUrl":"https://www.openstreetmap.org/relation/10789860","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"vuelta","directionId":0}]}]}</script>
+  <script id="report-data" type="application/json">{"slug":"taquina","operator":"Taquiña","cityName":"cochabamba","generatedAt":"2026-05-30T19:25:58.978Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":61},"refGroups":[{"ref":"Taquiña","gtfsRouteId":44,"routeColor":"888888","routeLongName":"Trufi Taquiña","variants":[{"osmId":9386184,"ref":"Taquiña","name":"Trufi Taquiña: Cruce Taquiña → Planta Taquiña","from":"Cruce Taquiña","to":"Planta Taquiña","description":"","tripHeadsign":"Planta Taquiña","routeType":"bus","gtfsRouteId":44,"routeColor":"888888","stopCount":31,"stops":[{"id":11535045440,"name":"Avenida Simón López","lat":-17.3546007,"lon":-66.1875161},{"id":7814223044,"name":"Avenida Centenario","lat":-17.3540242,"lon":-66.1873775},{"id":11486083223,"name":"Avenida Centenario","lat":-17.3519658,"lon":-66.186065},{"id":601871700,"name":"Avenida Centenario","lat":-17.3506681,"lon":-66.1848103},{"id":5290354590,"name":"Rotonda Circunvalación Beijing y Centenario y Avenida Centenario","lat":-17.3505203,"lon":-66.1845282},{"id":9049566118,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.350445,"lon":-66.1843972},{"id":9343671210,"name":"Avenida Centenario","lat":-17.35034,"lon":-66.1843539},{"id":2318865845,"name":"Avenida Centenario","lat":-17.3500126,"lon":-66.1841563},{"id":2318865814,"name":"Avenida Centenario","lat":-17.3482265,"lon":-66.1830568},{"id":11813320201,"name":"Avenida Centenario","lat":-17.3478156,"lon":-66.1829083},{"id":2318865756,"name":"Avenida Centenario","lat":-17.3466748,"lon":-66.1830371},{"id":2318865729,"name":"Avenida Centenario","lat":-17.3450696,"lon":-66.1832729},{"id":2318865713,"name":"Avenida Centenario","lat":-17.3440623,"lon":-66.1833137},{"id":2318865693,"name":"Avenida Centenario","lat":-17.3429886,"lon":-66.1832772},{"id":3281400409,"name":"Avenida Centenario","lat":-17.3420199,"lon":-66.1833169},{"id":1583335234,"name":"Avenida Centenario","lat":-17.3409587,"lon":-66.1835303},{"id":1583335462,"name":"Avenida Centenario","lat":-17.3385004,"lon":-66.1832061},{"id":7245757843,"name":"Avenida Centenario","lat":-17.3371529,"lon":-66.1833119},{"id":1583335328,"name":"Avenida Centenario","lat":-17.3365805,"lon":-66.1834593},{"id":3281400287,"name":"Avenida Centenario","lat":-17.3348212,"lon":-66.1836277},{"id":1583335321,"name":"Avenida Centenario","lat":-17.3343349,"lon":-66.1835533},{"id":1583335297,"name":"Avenida Centenario","lat":-17.3338547,"lon":-66.1835333},{"id":1583335270,"name":"Avenida Centenario","lat":-17.3327959,"lon":-66.1836193},{"id":1583335362,"name":"Avenida Centenario","lat":-17.3324792,"lon":-66.1833671},{"id":3281400275,"name":"Avenida Centenario","lat":-17.3321778,"lon":-66.1831079},{"id":3281400274,"name":"Avenida Centenario","lat":-17.3317824,"lon":-66.1830757},{"id":3281400271,"name":"Avenida Centenario","lat":-17.3313978,"lon":-66.1829246},{"id":10074224270,"name":"Avenida Centenario","lat":-17.3311127,"lon":-66.1830527},{"id":4237666301,"name":"Avenida Centenario","lat":-17.3303064,"lon":-66.1845891},{"id":4237671848,"name":"Avenida Centenario","lat":-17.3292236,"lon":-66.1851916},{"id":1583335363,"name":"Avenida Centenario","lat":-17.3286237,"lon":-66.185049}],"coordinates":[[-66.1875161,-17.3546007],[-66.1874929,-17.3545067],[-66.1874286,-17.3542617],[-66.1873663,-17.3541458],[-66.1873775,-17.3540242],[-66.1872937,-17.3538857],[-66.1871481,-17.3536482],[-66.1861434,-17.3520867],[-66.1861017,-17.3520162],[-66.186065,-17.3519658],[-66.1858522,-17.3516733],[-66.1857698,-17.3515687],[-66.1856447,-17.3514444],[-66.1848103,-17.3506681],[-66.1847541,-17.3506389],[-66.1846645,-17.3505718],[-66.184614,-17.3505451],[-66.1845282,-17.3505203],[-66.1845006,-17.3505191],[-66.1844682,-17.3505106],[-66.184439,-17.3504947],[-66.1844148,-17.3504723],[-66.1843972,-17.350445],[-66.1843872,-17.3504143],[-66.1843854,-17.3503822],[-66.1843887,-17.3503619],[-66.1843539,-17.35034],[-66.1843332,-17.3503167],[-66.1842927,-17.35025],[-66.1842576,-17.350188],[-66.1842669,-17.3501375],[-66.1841563,-17.3500126],[-66.1840928,-17.3499413],[-66.1840229,-17.3498411],[-66.1836296,-17.3491889],[-66.1830568,-17.3482265],[-66.1829677,-17.348053],[-66.1829276,-17.3479493],[-66.1829118,-17.3478907],[-66.1829083,-17.3478156],[-66.1829112,-17.3476633],[-66.1829465,-17.3473787],[-66.1830077,-17.3468884],[-66.1830306,-17.346728],[-66.1830371,-17.3466748],[-66.1830464,-17.3466109],[-66.1831552,-17.3458667],[-66.1832556,-17.345172],[-66.1832729,-17.3450696],[-66.1833221,-17.3446344],[-66.1833331,-17.3444964],[-66.1833463,-17.3443677],[-66.1833137,-17.3440623],[-66.1833156,-17.343814],[-66.1833281,-17.3435946],[-66.1833205,-17.3433258],[-66.1833032,-17.3432124],[-66.1832772,-17.3429886],[-66.183266,-17.3428618],[-66.1832708,-17.3427804],[-66.1833065,-17.3424033],[-66.1833169,-17.3420199],[-66.1833683,-17.3417525],[-66.1834304,-17.3414975],[-66.1834724,-17.3413503],[-66.1835184,-17.3411215],[-66.1835303,-17.3409587],[-66.1834677,-17.3404596],[-66.183458,-17.3404028],[-66.1832851,-17.3393115],[-66.1832061,-17.3385004],[-66.1831954,-17.3382791],[-66.1832054,-17.3381585],[-66.1832994,-17.3372232],[-66.1833119,-17.3371529],[-66.1833375,-17.3370094],[-66.183413,-17.3367728],[-66.1834218,-17.3367346],[-66.1834507,-17.3366449],[-66.1834593,-17.3365805],[-66.1834133,-17.3356584],[-66.1834663,-17.3353881],[-66.1835007,-17.335272],[-66.1836277,-17.3348212],[-66.1836415,-17.3347235],[-66.183636,-17.3345969],[-66.1836096,-17.3344892],[-66.1835533,-17.3343349],[-66.1835281,-17.3342243],[-66.1835233,-17.3341896],[-66.1835095,-17.3340884],[-66.1835169,-17.3339372],[-66.1835333,-17.3338547],[-66.1835695,-17.3336565],[-66.1836183,-17.3331559],[-66.183632,-17.3329838],[-66.1836193,-17.3327959],[-66.1835926,-17.3327114],[-66.1835388,-17.3326268],[-66.1834741,-17.332554],[-66.1833671,-17.3324792],[-66.1832869,-17.3324382],[-66.1832092,-17.3323851],[-66.1831627,-17.3323336],[-66.1831293,-17.3322725],[-66.1831079,-17.3321778],[-66.1831058,-17.3320973],[-66.183115,-17.3320348],[-66.1831042,-17.3318766],[-66.1830757,-17.3317824],[-66.1830397,-17.3317022],[-66.1829987,-17.3316237],[-66.1829674,-17.3315536],[-66.1829387,-17.3314641],[-66.1829246,-17.3313978],[-66.1829215,-17.3313204],[-66.1829294,-17.3312364],[-66.18296,-17.3311833],[-66.1830527,-17.3311127],[-66.1831582,-17.3310401],[-66.1843941,-17.3304601],[-66.1845065,-17.3303779],[-66.1845891,-17.3303064],[-66.1848064,-17.3300006],[-66.1849528,-17.3298393],[-66.1850234,-17.3297418],[-66.1850432,-17.3296638],[-66.1851916,-17.3292236],[-66.1852352,-17.3290366],[-66.1852277,-17.3289512],[-66.1851918,-17.3288119],[-66.1851334,-17.3286933],[-66.185049,-17.3286237]],"osmUrl":"https://www.openstreetmap.org/relation/9386184","status":"ok","errorMessage":"","fee":"yes","onDemand":"yes","directionLabel":"ida","directionId":1},{"osmId":10789860,"ref":"Taquiña","name":"Trufi Taquiña: Planta Taquiña → Cruce Taquiña","from":"Planta Taquiña","to":"Cruce Taquiña","description":"","tripHeadsign":"Cruce Taquiña","routeType":"bus","gtfsRouteId":44,"routeColor":"888888","stopCount":30,"stops":[{"id":1583335363,"name":"Avenida Centenario","lat":-17.3286237,"lon":-66.185049},{"id":1583335288,"name":"Avenida Centenario","lat":-17.3290366,"lon":-66.1852352},{"id":4237666296,"name":"Avenida Centenario","lat":-17.3300006,"lon":-66.1848064},{"id":8762265495,"name":"Avenida Centenario","lat":-17.3310401,"lon":-66.1831582},{"id":3281400271,"name":"Avenida Centenario","lat":-17.3313978,"lon":-66.1829246},{"id":1583335394,"name":"Avenida Centenario","lat":-17.3317022,"lon":-66.1830397},{"id":3281400275,"name":"Avenida Centenario","lat":-17.3321778,"lon":-66.1831079},{"id":3281400278,"name":"Avenida Centenario","lat":-17.3324382,"lon":-66.1832869},{"id":1583335270,"name":"Avenida Centenario","lat":-17.3327959,"lon":-66.1836193},{"id":1583335297,"name":"Avenida Centenario","lat":-17.3338547,"lon":-66.1835333},{"id":1583335321,"name":"Avenida Centenario","lat":-17.3343349,"lon":-66.1835533},{"id":3281400287,"name":"Avenida Centenario","lat":-17.3348212,"lon":-66.1836277},{"id":2087373751,"name":"Avenida Centenario","lat":-17.3366449,"lon":-66.1834507},{"id":7245757843,"name":"Avenida Centenario","lat":-17.3371529,"lon":-66.1833119},{"id":2318865643,"name":"Avenida Centenario","lat":-17.3393115,"lon":-66.1832851},{"id":1583335330,"name":"Avenida Centenario","lat":-17.3411215,"lon":-66.1835184},{"id":1583335267,"name":"Avenida Centenario","lat":-17.3424033,"lon":-66.1833065},{"id":1583335284,"name":"Avenida Centenario","lat":-17.3432124,"lon":-66.1833032},{"id":2318865718,"name":"Avenida Centenario","lat":-17.3443677,"lon":-66.1833463},{"id":2318865732,"name":"Avenida Centenario","lat":-17.345172,"lon":-66.1832556},{"id":2318865762,"name":"Avenida Centenario","lat":-17.3468884,"lon":-66.1830077},{"id":1583335499,"name":"Avenida Centenario","lat":-17.3478907,"lon":-66.1829118},{"id":1583335179,"name":"Avenida Centenario","lat":-17.3498411,"lon":-66.1840229},{"id":2368317080,"name":"Avenida Centenario","lat":-17.3501513,"lon":-66.1843085},{"id":9819008046,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.3502664,"lon":-66.1845506},{"id":11486083230,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.3503376,"lon":-66.1846434},{"id":9049566109,"name":"Avenida Centenario","lat":-17.350537,"lon":-66.1847036},{"id":3279659560,"name":"Avenida Centenario","lat":-17.3515687,"lon":-66.1857698},{"id":9049626817,"name":"Avenida Centenario","lat":-17.3536482,"lon":-66.1871481},{"id":851595310,"name":"Avenida Simón López y Avenida Centenario","lat":-17.3544767,"lon":-66.1876781}],"coordinates":[[-66.185049,-17.3286237],[-66.1851334,-17.3286933],[-66.1851918,-17.3288119],[-66.1852277,-17.3289512],[-66.1852352,-17.3290366],[-66.1851916,-17.3292236],[-66.1850432,-17.3296638],[-66.1850234,-17.3297418],[-66.1849528,-17.3298393],[-66.1848064,-17.3300006],[-66.1845891,-17.3303064],[-66.1845065,-17.3303779],[-66.1843941,-17.3304601],[-66.1831582,-17.3310401],[-66.1830527,-17.3311127],[-66.18296,-17.3311833],[-66.1829294,-17.3312364],[-66.1829215,-17.3313204],[-66.1829246,-17.3313978],[-66.1829387,-17.3314641],[-66.1829674,-17.3315536],[-66.1829987,-17.3316237],[-66.1830397,-17.3317022],[-66.1830757,-17.3317824],[-66.1831042,-17.3318766],[-66.183115,-17.3320348],[-66.1831058,-17.3320973],[-66.1831079,-17.3321778],[-66.1831293,-17.3322725],[-66.1831627,-17.3323336],[-66.1832092,-17.3323851],[-66.1832869,-17.3324382],[-66.1833671,-17.3324792],[-66.1834741,-17.332554],[-66.1835388,-17.3326268],[-66.1835926,-17.3327114],[-66.1836193,-17.3327959],[-66.183632,-17.3329838],[-66.1836183,-17.3331559],[-66.1835695,-17.3336565],[-66.1835333,-17.3338547],[-66.1835169,-17.3339372],[-66.1835095,-17.3340884],[-66.1835233,-17.3341896],[-66.1835281,-17.3342243],[-66.1835533,-17.3343349],[-66.1836096,-17.3344892],[-66.183636,-17.3345969],[-66.1836415,-17.3347235],[-66.1836277,-17.3348212],[-66.1835007,-17.335272],[-66.1834663,-17.3353881],[-66.1834133,-17.3356584],[-66.1834593,-17.3365805],[-66.1834507,-17.3366449],[-66.1834218,-17.3367346],[-66.183413,-17.3367728],[-66.1833375,-17.3370094],[-66.1833119,-17.3371529],[-66.1832994,-17.3372232],[-66.1832054,-17.3381585],[-66.1831954,-17.3382791],[-66.1832061,-17.3385004],[-66.1832851,-17.3393115],[-66.183458,-17.3404028],[-66.1834677,-17.3404596],[-66.1835303,-17.3409587],[-66.1835184,-17.3411215],[-66.1834724,-17.3413503],[-66.1834304,-17.3414975],[-66.1833683,-17.3417525],[-66.1833169,-17.3420199],[-66.1833065,-17.3424033],[-66.1832708,-17.3427804],[-66.183266,-17.3428618],[-66.1832772,-17.3429886],[-66.1833032,-17.3432124],[-66.1833205,-17.3433258],[-66.1833281,-17.3435946],[-66.1833156,-17.343814],[-66.1833137,-17.3440623],[-66.1833463,-17.3443677],[-66.1833331,-17.3444964],[-66.1833221,-17.3446344],[-66.1832729,-17.3450696],[-66.1832556,-17.345172],[-66.1831552,-17.3458667],[-66.1830464,-17.3466109],[-66.1830371,-17.3466748],[-66.1830306,-17.346728],[-66.1830077,-17.3468884],[-66.1829465,-17.3473787],[-66.1829112,-17.3476633],[-66.1829083,-17.3478156],[-66.1829118,-17.3478907],[-66.1829276,-17.3479493],[-66.1829677,-17.348053],[-66.1830568,-17.3482265],[-66.1836296,-17.3491889],[-66.1840229,-17.3498411],[-66.1840928,-17.3499413],[-66.1841563,-17.3500126],[-66.1842669,-17.3501375],[-66.1843085,-17.3501513],[-66.1843773,-17.3502007],[-66.1844345,-17.3502214],[-66.1845064,-17.3502635],[-66.1845269,-17.350263],[-66.1845506,-17.3502664],[-66.1845742,-17.3502737],[-66.1845987,-17.350287],[-66.1846268,-17.3503096],[-66.1846434,-17.3503376],[-66.1846538,-17.3503746],[-66.184655,-17.3503943],[-66.1846496,-17.3504322],[-66.1846759,-17.3504945],[-66.1847036,-17.350537],[-66.1847735,-17.3506081],[-66.1848103,-17.3506681],[-66.1856447,-17.3514444],[-66.1857698,-17.3515687],[-66.1858522,-17.3516733],[-66.186065,-17.3519658],[-66.1861017,-17.3520162],[-66.1861434,-17.3520867],[-66.1871481,-17.3536482],[-66.1872937,-17.3538857],[-66.1873775,-17.3540242],[-66.1876269,-17.3543984],[-66.187654,-17.3544399],[-66.1876781,-17.3544767]],"osmUrl":"https://www.openstreetmap.org/relation/10789860","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"vuelta","directionId":0}]}]}</script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
 (function () {
@@ -418,12 +472,26 @@
 
     var refHead = document.createElement('div');
     refHead.className = 'vis-ref-head';
+    var chevron = document.createElement('span');
+    chevron.className = 'vis-chevron';
+    chevron.textContent = '▶';
+    refHead.appendChild(chevron);
     var refCb = document.createElement('input');
     refCb.type = 'checkbox';
     refCb.title = 'Mostrar/ocultar línea ' + group.ref;
     refHead.appendChild(refCb);
-    refHead.appendChild(document.createTextNode(' Línea ' + group.ref + ' (' + group.variants.length + ')'));
+    var titleSpan = document.createElement('span');
+    titleSpan.className = 'vis-ref-title';
+    titleSpan.textContent = 'Línea ' + group.ref;
+    refHead.appendChild(titleSpan);
+    var countSpan = document.createElement('span');
+    countSpan.className = 'vis-ref-count';
+    countSpan.textContent = '(' + group.variants.length + ')';
+    refHead.appendChild(countSpan);
     refBlock.appendChild(refHead);
+
+    var refBody = document.createElement('div');
+    refBody.className = 'vis-ref-body collapsed';
 
     group.variants.forEach(function (v) {
       if (!variantLayers[v.osmId]) return;
@@ -445,9 +513,10 @@
 
       row.appendChild(cb);
       row.appendChild(text);
-      refBlock.appendChild(row);
+      refBody.appendChild(row);
 
-      cb.addEventListener('change', function () {
+      cb.addEventListener('change', function (e) {
+        e.stopPropagation();
         setVariantVisible(v.osmId, cb.checked);
         updateRefCheckbox(refCb, group);
       });
@@ -458,15 +527,19 @@
       });
     });
 
+    refBlock.appendChild(refBody);
+    refCb.addEventListener('click', function (e) { e.stopPropagation(); });
     refCb.addEventListener('change', function () {
       group.variants.forEach(function (v) {
         if (variantLayers[v.osmId]) setVariantVisible(v.osmId, refCb.checked);
       });
-      refBlock.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
+      refBody.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
     });
 
     refHead.addEventListener('click', function (e) {
-      if (e.target !== refCb) { refCb.checked = !refCb.checked; refCb.dispatchEvent(new Event('change')); }
+      if (e.target === refCb) return;
+      refBody.classList.toggle('collapsed');
+      refHead.classList.toggle('expanded', !refBody.classList.contains('collapsed'));
     });
 
     visList.appendChild(refBlock);
@@ -522,8 +595,17 @@
     header.innerHTML =
       '<span class="route-badge">' + esc(group.ref) + '</span>' +
       '<span class="route-title">' + esc(group.routeLongName || group.ref) + '</span>' +
-      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>';
+      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>' +
+      '<button type="button" class="route-validate-btn">Validar línea ' + esc(group.ref) + '</button>';
     card.appendChild(header);
+
+    header.querySelector('.route-validate-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      card.classList.add('open');
+      if (!routeMaps[group.ref]) initRefMap(group, card.querySelector('.route-map'));
+      openValidationModal();
+      setTimeout(function () { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+    });
 
     var body = document.createElement('div');
     body.className = 'route-body';
@@ -591,9 +673,9 @@
       block.appendChild(valDiv);
       block.querySelector('.show-on-map').addEventListener('click', function (e) {
         e.preventDefault();
+        closeValidationModal();
         setVariantVisible(v.osmId, true);
         selectVariant(v.osmId);
-        document.getElementById('overview-map').scrollIntoView({ behavior: 'smooth' });
       });
 
       variantsCol.appendChild(block);
@@ -655,12 +737,14 @@
       var show = !refFilter || ref === refFilter;
       if (show && q) {
         var any = false;
+        var body = rg.querySelector('.vis-ref-body');
         rg.querySelectorAll('.vis-variant').forEach(function (row) {
           var match = row.dataset.search.indexOf(q) >= 0;
           row.style.display = match ? '' : 'none';
           if (match) any = true;
         });
         rg.style.display = any ? '' : 'none';
+        if (any && body) { body.classList.remove('collapsed'); rg.querySelector('.vis-ref-head').classList.add('expanded'); }
       } else {
         rg.style.display = show ? '' : 'none';
         rg.querySelectorAll('.vis-variant').forEach(function (row) { row.style.display = ''; });
@@ -700,11 +784,31 @@
     URL.revokeObjectURL(a.href);
   });
 
+  function openValidationModal() {
+    document.getElementById('validation-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeValidationModal() {
+    document.getElementById('validation-modal').classList.remove('open');
+    document.body.style.overflow = 'hidden';
+    invalidateMap();
+  }
+
+  document.getElementById('open-validation-fab').addEventListener('click', openValidationModal);
+  document.getElementById('open-validation-toolbar').addEventListener('click', openValidationModal);
+  document.getElementById('close-validation').addEventListener('click', closeValidationModal);
+  document.getElementById('validation-modal').addEventListener('click', function (e) {
+    if (e.target.id === 'validation-modal') closeValidationModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeValidationModal();
+  });
+
   refreshAllStyles();
   updateProgress();
 
   function invalidateMap() {
-    setTimeout(function () { overviewMap.invalidateSize(); }, 50);
+    setTimeout(function () { overviewMap.invalidateSize(); }, 80);
   }
 
   function toggleSidebar() {
@@ -716,7 +820,8 @@
   document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
   document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
   window.addEventListener('resize', invalidateMap);
-  invalidateMap();
+  setTimeout(invalidateMap, 150);
+  setTimeout(invalidateMap, 500);
 })();
   </script>
 </body>
