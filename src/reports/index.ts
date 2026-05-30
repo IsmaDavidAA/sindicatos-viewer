@@ -4,10 +4,12 @@ import type { BuildReportsInput } from './build_report_data';
 import { buildSindicatoReports } from './build_report_data';
 import { generateSindicatoHtml } from './html_generator';
 import { generateSindicatoMarkdown } from './markdown_generator';
+import { generateSiteIndex } from './site_index_generator';
 import type { SindicatoReportManifestEntry } from './types';
 
 export interface WriteSindicatoReportsOptions extends BuildReportsInput {
   reportsDir: string;
+  displayName?: string;
   /** Internal manifest for Trufi team — not linked from sindicato pages */
   writeInternalManifest?: boolean;
 }
@@ -83,6 +85,17 @@ export function writeSindicatoReports(options: WriteSindicatoReportsOptions): Wr
       'utf8',
     );
   }
+
+  fs.writeFileSync(
+    path.join(reportsDir, 'index.html'),
+    generateSiteIndex({
+      cityName: input.cityName,
+      displayName: options.displayName || input.cityName,
+      generatedAt: new Date().toISOString(),
+      manifest,
+    }),
+    'utf8',
+  );
 
   console.log(`Sindicato reports: ${reports.length} sindicatos → ${reportsDir}`);
   return { reports, manifest };

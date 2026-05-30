@@ -1,0 +1,79 @@
+name: Deploy sindicato reports
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sindicatos-viewer
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve GTFS input
+        id: gtfs
+        run: |
+          if [ -f input/cochabamba/log.json ]; then
+            echo "dir=${{ github.workspace }}/input/cochabamba" >> "$GITHUB_OUTPUT"
+            echo "source=committed input/" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=${{ github.workspace }}/trufi-gtfs-builder/examples/Bolivia-Cochabamba/out" >> "$GITHUB_OUTPUT"
+            echo "source=trufi-gtfs-builder" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout trufi-gtfs-builder
+        if: steps.gtfs.outputs.source == 'trufi-gtfs-builder'
+        uses: actions/checkout@v4
+        with:
+          repository: trufi-association/trufi-gtfs-builder
+          path: trufi-gtfs-builder
+
+      - name: Build GTFS (Cochabamba)
+        if: steps.gtfs.outputs.source == 'trufi-gtfs-builder'
+        working-directory: trufi-gtfs-builder
+        timeout-minutes: 120
+        run: |
+          npm ci
+          npm run build
+          cd examples/Bolivia-Cochabamba
+          npm install --no-audit --no-fund
+          npx ts-node index.ts
+
+      - name: Install sindicatos-routes
+        run: npm ci
+
+      - name: Generate reports
+        env:
+          GTFS_OUT_DIR: ${{ steps.gtfs.outputs.dir }}
+        run: npm run generate:cochabamba
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/cochabamba
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

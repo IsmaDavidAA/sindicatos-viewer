@@ -17,7 +17,11 @@ function loadCityConfig(cityId: string): CityConfig {
     throw new Error(`Config not found: ${configPath}\nAvailable: list files in config/`);
   }
   const raw = JSON.parse(fs.readFileSync(configPath, 'utf8')) as CityConfig;
-  raw.gtfsOutDir = path.resolve(path.join(path.dirname(configPath), raw.gtfsOutDir));
+  if (process.env.GTFS_OUT_DIR) {
+    raw.gtfsOutDir = path.resolve(process.env.GTFS_OUT_DIR);
+  } else {
+    raw.gtfsOutDir = path.resolve(path.join(path.dirname(configPath), raw.gtfsOutDir));
+  }
   return raw;
 }
 
@@ -37,9 +41,11 @@ export function generateForCity(cityId: string): void {
   const result = writeSindicatoReports({
     ...input,
     reportsDir: siteDir,
+    displayName: config.displayName,
   });
 
-  const base = config.githubPagesBasePath || `/sindicatos-routes/site/${config.siteSubdir}`;
+  const repo = process.env.GITHUB_REPOSITORY || 'USER/REPO';
+  const base = config.githubPagesBasePath ?? `/${repo.split('/')[1]}`;
   console.log(`\n✅ ${result.reports.length} reportes generados`);
   console.log(`\nURLs GitHub Pages (ejemplo):`);
   for (const entry of result.manifest.slice(0, 3)) {

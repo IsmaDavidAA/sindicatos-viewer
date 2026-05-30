@@ -2,6 +2,7 @@
   "cityName": "cochabamba",
   "displayName": "Cochabamba, Bolivia",
   "gtfsOutDir": "../../trufi-gtfs-builder/examples/Bolivia-Cochabamba/out",
+  "gtfsOutDirCi": "input/cochabamba",
   "siteSubdir": "cochabamba",
-  "githubPagesBasePath": "/sindicatos-routes/site/cochabamba"
+  "githubPagesBasePath": "/sindicatos-viewer"
 }

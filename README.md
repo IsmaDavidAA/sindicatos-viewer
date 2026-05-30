@@ -97,7 +97,28 @@ Markdown (GitHub lo renderiza):
 …/site/cochabamba/sindicato-mixto-de-autotransporte-sacaba/report.md
 ```
 
-## Publicar en GitHub Pages
+## Publicar en GitHub Pages (automático)
+
+El workflow `.github/workflows/deploy-pages.yml` en cada push a `main`:
+
+1. Descarga `trufi-gtfs-builder` y genera GTFS de Cochabamba (Overpass), **o** usa `input/cochabamba/` si lo commiteaste (más rápido).
+2. Ejecuta `npm run generate:cochabamba`.
+3. Publica `site/cochabamba/` en GitHub Pages.
+
+**Activar Pages (una sola vez):** Repo → Settings → Pages → Source: **GitHub Actions**.
+
+**URLs:**
+
+| Página | URL |
+|--------|-----|
+| Índice (todos los sindicatos) | `https://ismadavidaa.github.io/sindicatos-viewer/` |
+| Un sindicato | `https://ismadavidaa.github.io/sindicatos-viewer/cotapachi/` |
+
+Lista completa: `site/cochabamba/_internal/manifest.json`
+
+**CI más rápido:** copia `trufi-gtfs-builder/.../out/` a `input/cochabamba/` y commitea (log.json + gtfs/ + routes/).
+
+## Publicar en GitHub Pages (manual)
 
 **Opción A — carpeta `/site` en el repo**
 
