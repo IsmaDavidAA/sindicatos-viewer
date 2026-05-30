@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Sindicato Pucara Grande — Validación de rutas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --bg: #f4f6f8; --card: #fff; --text: #1a1a2e; --muted: #5c6370;
+      --accent: #2563eb; --accent-hover: #1d4ed8; --highlight: #f59e0b;
+      --ok: #16a34a; --warn: #d97706; --err: #dc2626; --border: #e2e8f0;
+      --dim: #cbd5e1; --ida: #2563eb; --vuelta: #9333ea;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      display: flex; flex-direction: column;
+    }
+    .top-chrome {
+      flex-shrink: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      z-index: 600;
+    }
+    .top-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: #fff;
+    }
+    .top-row h1 { margin: 0; font-size: 1.05rem; font-weight: 600; flex: 1; min-width: 10rem; }
+    .top-meta { font-size: 0.78rem; opacity: 0.9; white-space: nowrap; }
+    .stats { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .stat { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.75rem; white-space: nowrap; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      align-items: center;
+      background: var(--card);
+    }
+    .toolbar input, .toolbar select, .toolbar button {
+      font: inherit; padding: 0.35rem 0.55rem; border: 1px solid var(--border);
+      border-radius: 6px; background: #fff; font-size: 0.85rem;
+    }
+    .toolbar input[type=search] { flex: 1; min-width: 8rem; max-width: 16rem; }
+    .toolbar button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+    .toolbar button:hover { background: var(--accent-hover); }
+    .toolbar button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
+    .toolbar button.icon-btn { padding: 0.35rem 0.6rem; min-width: 2rem; }
+    .progress-bar { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .map-workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      height: calc(100vh - 6.5rem);
+      max-height: calc(100vh - 6.5rem);
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .sidebar-toggle {
+      display: none;
+      position: absolute; top: 0.5rem; left: 0.5rem; z-index: 450;
+      font: inherit; font-size: 0.8rem; padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: rgba(255,255,255,0.95); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    .map-sidebar {
+      width: 300px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      height: 100%; min-height: 0;
+      background: #fafbfc;
+      transition: transform 0.2s ease, width 0.2s ease;
+      z-index: 440;
+    }
+    .map-sidebar.collapsed { width: 0; overflow: hidden; border-right: none; }
+    .map-sidebar-head { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0; }
+    .map-sidebar-head h2 { margin: 0 0 0.3rem; font-size: 0.88rem; }
+    .map-sidebar-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .map-sidebar-actions button {
+      font: inherit; font-size: 0.72rem; padding: 0.22rem 0.45rem;
+      border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer;
+    }
+    .map-sidebar-actions button:hover { background: #e2e8f0; }
+    .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
+    .vis-ref-group { border-bottom: 1px solid var(--border); }
+    .vis-ref-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; background: #fafbfc; cursor: pointer; }
+    .vis-ref-head input { margin: 0; }
+    .vis-variant { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem 0.75rem 0.3rem 1.15rem; font-size: 0.76rem; cursor: pointer; border-left: 3px solid transparent; }
+    .vis-variant:hover { background: #f8fafc; }
+    .vis-variant.selected { background: #fffbeb; border-left-color: var(--highlight); }
+    .vis-variant input { margin-top: 0.12rem; flex-shrink: 0; }
+    .vis-variant-text { flex: 1; min-width: 0; }
+    .vis-variant-text strong { display: block; font-weight: 500; font-size: 0.78rem; }
+    .dir-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 0.08rem 0.3rem; border-radius: 4px; margin-right: 0.2rem; }
+    .dir-ida { background: #dbeafe; color: var(--ida); }
+    .dir-vuelta { background: #ede9fe; color: var(--vuelta); }
+    .dir-unico { background: #f1f5f9; color: var(--muted); }
+    .map-main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0; }
+    .map-main-head {
+      padding: 0.35rem 0.75rem; font-size: 0.78rem; color: var(--muted);
+      border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0;
+    }
+    .map-wrap { position: relative; flex: 1; min-height: 0; }
+    #overview-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-empty-hint {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(255,255,255,0.94); padding: 0.65rem 1rem; border-radius: 8px;
+      font-size: 0.85rem; color: var(--muted); pointer-events: none; z-index: 400;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+    .dir-arrow-icon { background: none !important; border: none !important; font-size: 14px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 4px #fff; }
+    .validation-panel {
+      flex-shrink: 0;
+      max-width: 1200px; width: 100%; margin: 0 auto;
+      padding: 1.25rem 1rem 2rem;
+    }
+    .validation-panel > h2 { margin: 0 0 1rem; font-size: 1.1rem; color: var(--text); }
+    .route-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+    .route-card.hidden { display: none; }
+    .route-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.75rem 1rem; cursor: pointer; user-select: none; }
+    .route-header:hover { background: #f8fafc; }
+    .route-badge { font-weight: 700; font-size: 1.1rem; color: var(--accent); min-width: 3rem; }
+    .route-title { flex: 1; font-size: 0.95rem; }
+    .route-meta { font-size: 0.8rem; color: var(--muted); }
+    .route-body { display: none; border-top: 1px solid var(--border); }
+    .route-card.open .route-body { display: block; }
+    .route-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; }
+    @media (max-width: 768px) { .route-grid { grid-template-columns: 1fr; } }
+    .route-map { height: 260px; border-radius: 8px; border: 1px solid var(--border); }
+    .variant-block { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .variant-block:last-child { margin-bottom: 0; }
+    .variant-block h4 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+    .variant-links a { color: var(--accent); font-size: 0.85rem; margin-right: 1rem; }
+    .validation { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); }
+    .validation label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .validation-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+    .validation-row button { font: inherit; font-size: 0.8rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; cursor: pointer; }
+    .validation-row button.active[data-status="ok"] { background: #dcfce7; border-color: var(--ok); color: var(--ok); }
+    .validation-row button.active[data-status="fix"] { background: #fef3c7; border-color: var(--warn); color: var(--warn); }
+    .validation-row button.active[data-status="reject"] { background: #fee2e2; border-color: var(--err); color: var(--err); }
+    .validation textarea { width: 100%; min-height: 2.5rem; font: inherit; font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+    .stops-list { max-height: 180px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem; }
+    footer.app-footer { flex-shrink: 0; text-align: center; padding: 0.75rem; font-size: 0.75rem; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
+    .status-ok { color: var(--ok); }
+    .status-err { color: var(--err); }
+    @media (max-width: 900px) {
+      .map-workspace { height: calc(100vh - 7rem); max-height: calc(100vh - 7rem); }
+      .sidebar-toggle { display: block; }
+      .map-sidebar {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        box-shadow: 4px 0 16px rgba(0,0,0,0.15);
+      }
+      .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-chrome">
+    <div class="top-row">
+      <h1>Sindicato Pucara Grande</h1>
+      <span class="top-meta">cochabamba · 2026-05-30</span>
+      <div class="stats">
+        <span class="stat">2 relaciones</span>
+        <span class="stat">1 líneas</span>
+        <span class="stat">0 errores</span>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar ref, origen, destino…" aria-label="Buscar rutas">
+      <select id="filter-ref" aria-label="Filtrar por línea">
+        <option value="">Todas las líneas</option>
+        <option value="311">311 (2)</option>
+      </select>
+      <button type="button" class="secondary icon-btn" id="toggle-sidebar" title="Mostrar/ocultar panel de rutas">☰</button>
+      <button type="button" class="secondary" id="export-json">Exportar</button>
+      <span class="progress-bar" id="progress">0 / 0 validadas</span>
+    </div>
+  </div>
+
+  <div class="map-workspace">
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle-mobile">☰ Rutas</button>
+    <aside class="map-sidebar" id="map-sidebar">
+      <div class="map-sidebar-head">
+        <h2>Rutas en mapa</h2>
+        <div class="map-sidebar-actions">
+          <button type="button" id="vis-all">Todas</button>
+          <button type="button" id="vis-none">Ninguna</button>
+          <button type="button" id="fit-visible">Ajustar</button>
+        </div>
+      </div>
+      <div class="route-visibility-list" id="visibility-list"></div>
+    </aside>
+    <div class="map-main">
+      <div class="map-main-head" id="map-status">Seleccione rutas · clic en línea para resaltar</div>
+      <div class="map-wrap">
+        <div id="overview-map"></div>
+        <div class="map-empty-hint" id="map-hint">Marque rutas en el panel ← para verlas en el mapa</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="validation-panel">
+    <h2>Detalle y validación por ruta</h2>
+    <div id="routes-container"></div>
+  </section>
+
+  <footer class="app-footer">
+    Generado por <a href="https://www.trufi-association.org/" target="_blank" rel="noopener">Trufi Association</a> · observaciones guardadas localmente
+  </footer>
+
+  <script id="report-data" type="application/json">{"slug":"sindicato-pucara-grande","operator":"Sindicato Pucara Grande","cityName":"cochabamba","generatedAt":"2026-05-30T19:13:11.200Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":323},"refGroups":[{"ref":"311","gtfsRouteId":56,"routeColor":"888888","routeLongName":"Trufi 311","variants":[{"osmId":9430329,"ref":"311","name":"Trufi 311: Calle Canichana → Pampita Mejillones","from":"Calle Canichana","to":"Pampita Mejillones","description":"","tripHeadsign":"Pampita Mejillones","routeType":"bus","gtfsRouteId":56,"routeColor":"888888","stopCount":171,"stops":[{"id":809705530,"name":"Calle Arawaqui y Calle Canichana","lat":-17.3733272,"lon":-66.1910818},{"id":809705404,"name":"Calle 23 de Enero y Calle Chiriguano","lat":-17.3746342,"lon":-66.1898558},{"id":809705397,"name":"Calle Chiriguano","lat":-17.3764765,"lon":-66.1903925},{"id":1807004186,"name":"Calle Apurimak y Calle Ayllu","lat":-17.3779482,"lon":-66.1887473},{"id":2147353030,"name":"Calle Chimané","lat":-17.3793527,"lon":-66.187049},{"id":698492257,"name":"Calle Chimané y Calle Chipaya","lat":-17.3803389,"lon":-66.18615},{"id":698492211,"name":"Calle Chimané y Calle Sebastian de Irigoyen","lat":-17.3804989,"lon":-66.1837959},{"id":698492362,"name":"Avenida Beijing y Calle Casto Rojas y Calle Chimané","lat":-17.3806531,"lon":-66.1816754},{"id":698492356,"name":"Calle Casto Rojas","lat":-17.3806945,"lon":-66.1808082},{"id":7246421246,"name":"Calle Casto Rojas","lat":-17.3807203,"lon":-66.1794659},{"id":698492378,"name":"Calle Casto Rojas","lat":-17.3807508,"lon":-66.1786767},{"id":698492374,"name":"Calle Casto Rojas","lat":-17.3807806,"lon":-66.17796},{"id":12869588273,"name":"Calle Casto Rojas","lat":-17.3808101,"lon":-66.1772281},{"id":598178893,"name":"Avenida Melchor Pérez de Olguín y Calle Casto Rojas","lat":-17.3808385,"lon":-66.1764294},{"id":3296016818,"name":"Calle Casto Rojas","lat":-17.3808779,"lon":-66.1753939},{"id":598178924,"name":"Avenida Gabriel René Moreno y Calle Casto Rojas","lat":-17.3809356,"lon":-66.1743119},{"id":9005870628,"name":"Avenida Gabriel René Moreno","lat":-17.3790422,"lon":-66.1736677},{"id":2530023851,"name":"Avenida Gabriel René Moreno","lat":-17.3767622,"lon":-66.1730391},{"id":9005870811,"name":"Avenida Gabriel René Moreno","lat":-17.3763728,"lon":-66.1728893},{"id":13849964774,"name":"Avenida Gabriel René Moreno y Avenida Juan de la Rosa","lat":-17.3761637,"lon":-66.1727932},{"id":9005893462,"name":"Avenida Gabriel René Moreno","lat":-17.3745591,"lon":-66.1724521},{"id":9005893449,"name":"Avenida Gabriel René Moreno","lat":-17.373543,"lon":-66.1722783},{"id":2468433176,"name":"Rotonda América y Los Ceibos y Avenida Gabriel René Moreno","lat":-17.3720026,"lon":-66.1719539},{"id":689437277,"name":"Avenida América","lat":-17.3719969,"lon":-66.171319},{"id":2851924367,"name":"Avenida América","lat":-17.3721724,"lon":-66.168587},{"id":2851924370,"name":"Rotonda América y Ricardo Jaimes Freyre y Avenida Jaime Mendoza","lat":-17.3722433,"lon":-66.168454},{"id":2851924371,"name":"Rotonda América y Ricardo Jaimes Freyre y Avenida Jaime Mendoza","lat":-17.3722533,"lon":-66.1683542},{"id":599541191,"name":"Rotonda América y Ricardo Jaimes Freyre y Avenida América","lat":-17.372193,"lon":-66.1682794},{"id":11078784016,"name":"Avenida América","lat":-17.3722921,"lon":-66.1667194},{"id":2422613372,"name":"Avenida América","lat":-17.372394,"lon":-66.1651178},{"id":2287827733,"name":"Avenida América","lat":-17.3724851,"lon":-66.1636543},{"id":599541187,"name":"Avenida América y Avenida Libertador Simón Bolívar","lat":-17.372555,"lon":-66.1625774},{"id":2126672391,"name":"Avenida América","lat":-17.3726716,"lon":-66.1608008},{"id":2126672463,"name":"Avenida América","lat":-17.3727758,"lon":-66.1591567},{"id":9021398369,"name":"Avenida América","lat":-17.3727936,"lon":-66.1588691},{"id":2126672670,"name":"Avenida América","lat":-17.3728991,"lon":-66.1571999},{"id":2126673080,"name":"Plaza Charles de Gaulle","lat":-17.3731282,"lon":-66.1569993},{"id":2126673159,"name":"Plaza Charles de Gaulle","lat":-17.3731431,"lon":-66.1567491},{"id":9141778520,"name":"Plaza Charles de Gaulle","lat":-17.3730242,"lon":-66.1566075},{"id":676069627,"name":"Avenida América","lat":-17.3729988,"lon":-66.1557479},{"id":11949496247,"name":"Avenida América","lat":-17.3730741,"lon":-66.1546287},{"id":9112306456,"name":"Avenida América","lat":-17.3731276,"lon":-66.1535771},{"id":2380942946,"name":"Avenida América y Avenida General José Manuel Pando","lat":-17.3732909,"lon":-66.1511413},{"id":2126673621,"name":"Avenida América","lat":-17.3733757,"lon":-66.1498037},{"id":2126673752,"name":"Rotonda América y Melchor Urquidi","lat":-17.3734483,"lon":-66.1496806},{"id":2126673880,"name":"Rotonda América y Melchor Urquidi","lat":-17.3734759,"lon":-66.1495578},{"id":8459424860,"name":"Avenida América","lat":-17.3734072,"lon":-66.1494245},{"id":676069649,"name":"Avenida América y Calle Miguel María de Aguirre","lat":-17.3735011,"lon":-66.1477566},{"id":676069648,"name":"Avenida América y Calle Antonio Quijarro","lat":-17.3736203,"lon":-66.1459978},{"id":2126674108,"name":"Avenida América y Calle Antonio Quijarro","lat":-17.3736295,"lon":-66.1458624},{"id":13556304143,"name":"Avenida América","lat":-17.373719,"lon":-66.1444795},{"id":2126674132,"name":"Avenida América","lat":-17.3738017,"lon":-66.1433536},{"id":1785473238,"name":"Plaza Tarija y Avenida General Galindo León","lat":-17.3740869,"lon":-66.1430179},{"id":8373677220,"name":"Avenida General Galindo León","lat":-17.3753405,"lon":-66.1427526},{"id":8385091871,"name":"Avenida General Galindo León","lat":-17.3764786,"lon":-66.1425808},{"id":8385091876,"name":"Avenida General Galindo León","lat":-17.3769601,"lon":-66.1425249},{"id":8385093440,"name":"Rotonda Cámara de Comercio","lat":-17.3774945,"lon":-66.1424376},{"id":1795293377,"name":"Rotonda Cámara de Comercio","lat":-17.3776704,"lon":-66.1424359},{"id":1795293264,"name":"Innominada","lat":-17.3787904,"lon":-66.1423857},{"id":1795293296,"name":"Avenida Ramón Rivero y Avenida Aniceto Arce","lat":-17.3790829,"lon":-66.1430493},{"id":1795293405,"name":"Avenida Aniceto Arce","lat":-17.3792129,"lon":-66.1431024},{"id":602989537,"name":"Avenida Aniceto Arce","lat":-17.3796329,"lon":-66.1432028},{"id":3676912941,"name":"Avenida Aniceto Arce","lat":-17.3812809,"lon":-66.1443343},{"id":1807100710,"name":"Avenida Papa Paulo III y Avenida Aniceto Arce","lat":-17.3841328,"lon":-66.1462906},{"id":6179473096,"name":"Avenida Aniceto Arce","lat":-17.3860074,"lon":-66.1475669},{"id":2141431944,"name":"Avenida Aniceto Arce","lat":-17.3873491,"lon":-66.1485012},{"id":312425956,"name":"Avenida Aniceto Arce y Calle Luis Pasteur","lat":-17.3885389,"lon":-66.1493366},{"id":315096054,"name":"Avenida Aniceto Arce y Calle Luis Pasteur","lat":-17.3886449,"lon":-66.1493179},{"id":2524491860,"name":"Calle Luis Pasteur","lat":-17.3908667,"lon":-66.1488864},{"id":3924761818,"name":"Calle Luis Pasteur","lat":-17.3927788,"lon":-66.1484738},{"id":360129540,"name":"Calle José Antonio de Sucre","lat":-17.3925276,"lon":-66.146649},{"id":303215031,"name":"Calle José Antonio de Sucre y Calle José Pol","lat":-17.3921243,"lon":-66.1443707},{"id":8620183347,"name":"Avenida Manuel Isidoro Belzu","lat":-17.3919144,"lon":-66.1427214},{"id":2033335257,"name":"Rotonda Guillermo Urquidi y Belzu","lat":-17.3938301,"lon":-66.141917},{"id":2033336488,"name":"Innominada","lat":-17.3953799,"lon":-66.1432088},{"id":676069601,"name":"Calle Mariano Ricardo Terrazas","lat":-17.395723,"lon":-66.14491},{"id":10295946551,"name":"Calle Mariano Ricardo Terrazas","lat":-17.3961317,"lon":-66.1471433},{"id":5018719444,"name":"Calle José Armando Méndez","lat":-17.3964487,"lon":-66.1488172},{"id":1727306399,"name":"Avenida Aroma y Calle 16 de Julio","lat":-17.3984764,"lon":-66.1499487},{"id":648548725,"name":"Avenida Aroma y Calle 16 de Julio","lat":-17.3985529,"lon":-66.1499407},{"id":311361483,"name":"Calle 16 de Julio","lat":-17.3990035,"lon":-66.1499065},{"id":323985741,"name":"Avenida República y Calle 16 de Julio","lat":-17.3998668,"lon":-66.1498494},{"id":2768898982,"name":"Avenida República y Calle 16 de Julio","lat":-17.3999622,"lon":-66.1498455},{"id":3322575565,"name":"Calle 16 de Julio","lat":-17.4009322,"lon":-66.1489857},{"id":9928262328,"name":"Calle 16 de Julio","lat":-17.4013891,"lon":-66.1488898},{"id":702512015,"name":"Calle 16 de Julio","lat":-17.4018539,"lon":-66.1486934},{"id":659962352,"name":"Calle 16 de Julio","lat":-17.4023531,"lon":-66.1482901},{"id":10677663192,"name":"Calle 16 de Julio","lat":-17.4027543,"lon":-66.1476973},{"id":8192377531,"name":"Avenida Circuito Bolivia","lat":-17.4033443,"lon":-66.1467354},{"id":3325466473,"name":"Avenida Circuito Bolivia","lat":-17.4043358,"lon":-66.1459115},{"id":12777576113,"name":"Avenida Circuito Bolivia","lat":-17.4051795,"lon":-66.1455511},{"id":6166733752,"name":"Avenida Circuito Bolivia","lat":-17.4057459,"lon":-66.1453885},{"id":12777576109,"name":"Avenida Circuito Bolivia","lat":-17.4061755,"lon":-66.1453688},{"id":2031079607,"name":"Avenida 6 de Agosto","lat":-17.4064432,"lon":-66.1454109},{"id":646072448,"name":"Avenida 6 de Agosto","lat":-17.4067807,"lon":-66.1456262},{"id":2240938122,"name":"Avenida 6 de Agosto","lat":-17.4078445,"lon":-66.14731},{"id":3674274549,"name":"Avenida 6 de Agosto","lat":-17.4094939,"lon":-66.1496415},{"id":5610210464,"name":"Avenida 6 de Agosto","lat":-17.4100964,"lon":-66.1505664},{"id":5164453898,"name":"Avenida 6 de Agosto","lat":-17.4122767,"lon":-66.1539878},{"id":9599936944,"name":"Avenida 6 de Agosto","lat":-17.4128636,"lon":-66.1551309},{"id":3709606930,"name":"Avenida 6 de Agosto","lat":-17.4131113,"lon":-66.1556617},{"id":3709606943,"name":"Avenida 6 de Agosto","lat":-17.4132469,"lon":-66.1564693},{"id":13764559487,"name":"Avenida 6 de Agosto","lat":-17.4132093,"lon":-66.1572346},{"id":560101168,"name":"Avenida Panamericana y Calle Capinota","lat":-17.4120812,"lon":-66.1563676},{"id":13764586839,"name":"Avenida Panamericana","lat":-17.4126673,"lon":-66.1564322},{"id":3709607014,"name":"Avenida Panamericana","lat":-17.4138349,"lon":-66.1566412},{"id":1497947893,"name":"Avenida Panamericana","lat":-17.414698,"lon":-66.1568427},{"id":5433895294,"name":"Avenida Panamericana","lat":-17.4165706,"lon":-66.157197},{"id":740519920,"name":"Avenida Panamericana","lat":-17.4191214,"lon":-66.1576093},{"id":4679599413,"name":"Avenida Panamericana","lat":-17.4196932,"lon":-66.1576939},{"id":7768396127,"name":"Avenida Panamericana","lat":-17.4202297,"lon":-66.1577789},{"id":740519924,"name":"Avenida Panamericana","lat":-17.4209201,"lon":-66.1578847},{"id":1866314088,"name":"Avenida Panamericana y Calle Manuel P. Laredo","lat":-17.4226696,"lon":-66.1581657},{"id":3307354192,"name":"Avenida Panamericana y Avenida Copacabana","lat":-17.4257964,"lon":-66.1587448},{"id":2149915992,"name":"Avenida Panamericana y Calle Manuel Virreira","lat":-17.4269849,"lon":-66.1590776},{"id":3017389923,"name":"Avenida Panamericana","lat":-17.4283455,"lon":-66.15947},{"id":3306545385,"name":"Avenida Panamericana","lat":-17.4309823,"lon":-66.1602312},{"id":2149916029,"name":"Avenida Panamericana","lat":-17.4325749,"lon":-66.1606818},{"id":8263291564,"name":"Avenida Panamericana","lat":-17.434691,"lon":-66.1613043},{"id":3017399341,"name":"Avenida Panamericana","lat":-17.4375533,"lon":-66.1621276},{"id":13157367746,"name":"Avenida Panamericana","lat":-17.439231,"lon":-66.162509},{"id":13149511516,"name":"Avenida Panamericana y Avenida Tamborada","lat":-17.4393328,"lon":-66.1625256},{"id":3311611281,"name":"Avenida Panamericana","lat":-17.4399582,"lon":-66.162632},{"id":10566746270,"name":"Avenida Panamericana","lat":-17.4409845,"lon":-66.162857},{"id":12647051488,"name":"Avenida Panamericana","lat":-17.4425912,"lon":-66.1635294},{"id":1807317102,"name":"Avenida Panamericana y Calle Antonio Gallardo","lat":-17.4431637,"lon":-66.1636835},{"id":8256587110,"name":"Avenida Panamericana","lat":-17.444157,"lon":-66.1639603},{"id":8256587111,"name":"Avenida Panamericana","lat":-17.4461312,"lon":-66.1645853},{"id":1496873915,"name":"Avenida Panamericana","lat":-17.4474823,"lon":-66.1650357},{"id":3677947756,"name":"Avenida Panamericana","lat":-17.4476383,"lon":-66.1650712},{"id":8261043751,"name":"Avenida Panamericana","lat":-17.4494395,"lon":-66.1654498},{"id":8261043747,"name":"Avenida Panamericana","lat":-17.4516332,"lon":-66.1660904},{"id":8261043743,"name":"Avenida Panamericana","lat":-17.4523482,"lon":-66.1663435},{"id":8256587038,"name":"Avenida Panamericana","lat":-17.4533503,"lon":-66.1666086},{"id":8267521656,"name":"Avenida Panamericana","lat":-17.4548232,"lon":-66.1670847},{"id":8261043610,"name":"Avenida Panamericana","lat":-17.4557387,"lon":-66.1672792},{"id":8261043591,"name":"Avenida Panamericana","lat":-17.4578832,"lon":-66.1677161},{"id":12421401486,"name":"Avenida Panamericana","lat":-17.459016,"lon":-66.1679761},{"id":3679283205,"name":"Avenida Panamericana","lat":-17.4607246,"lon":-66.1684189},{"id":8261043582,"name":"Avenida Panamericana","lat":-17.4620313,"lon":-66.1687377},{"id":8261043537,"name":"Avenida Panamericana","lat":-17.4631987,"lon":-66.168873},{"id":8261043536,"name":"Avenida Panamericana","lat":-17.4634552,"lon":-66.168898},{"id":11124478076,"name":"Avenida Panamericana","lat":-17.4644354,"lon":-66.1691841},{"id":8261043530,"name":"Avenida Panamericana","lat":-17.4665464,"lon":-66.1697181},{"id":1628726586,"name":"Calle Estrella Sulafat","lat":-17.4667393,"lon":-66.1693264},{"id":3668007624,"name":"Calle Estrella Sulafat","lat":-17.4666823,"lon":-66.1690404},{"id":1628726633,"name":"Calle Estrella Sulafat","lat":-17.4667739,"lon":-66.1681291},{"id":1627089904,"name":"Innominada","lat":-17.4679873,"lon":-66.168726},{"id":3668009646,"name":"Innominada","lat":-17.4681627,"lon":-66.1688339},{"id":3668009653,"name":"Innominada","lat":-17.4685344,"lon":-66.1689362},{"id":3668009667,"name":"Innominada","lat":-17.4692903,"lon":-66.1690229},{"id":3668009680,"name":"Innominada","lat":-17.4696483,"lon":-66.1691974},{"id":8261012368,"name":"Innominada","lat":-17.4703437,"lon":-66.1696051},{"id":3668009710,"name":"Innominada","lat":-17.4711071,"lon":-66.1698651},{"id":3668009722,"name":"Innominada","lat":-17.4715344,"lon":-66.1699548},{"id":8261012346,"name":"Innominada","lat":-17.4722594,"lon":-66.1700756},{"id":1617603548,"name":"Calle Estrella Crater","lat":-17.4733396,"lon":-66.1702853},{"id":3668009744,"name":"Calle Estrella Crater","lat":-17.4733214,"lon":-66.1701042},{"id":1617603620,"name":"Calle La Alfalfa","lat":-17.4734245,"lon":-66.1700051},{"id":1617603845,"name":"Calle La Alfalfa","lat":-17.4743684,"lon":-66.1698937},{"id":3675465522,"name":"Calle La Alfalfa","lat":-17.4758761,"lon":-66.1695862},{"id":1617603638,"name":"Calle La Alfalfa","lat":-17.4762154,"lon":-66.1695108},{"id":1617603372,"name":"Calle La Alfalfa","lat":-17.4769167,"lon":-66.1692966},{"id":1617603334,"name":"Calle La Alfalfa","lat":-17.477365,"lon":-66.1691722},{"id":3675465576,"name":"Calle La Alfalfa","lat":-17.4777071,"lon":-66.1691117},{"id":1617603633,"name":"Calle La Alfalfa","lat":-17.477809,"lon":-66.1690324},{"id":3675465583,"name":"Calle Alfalfa","lat":-17.4779632,"lon":-66.1687497},{"id":9533706181,"name":"Avenida Golondrinera","lat":-17.4767878,"lon":-66.1670451},{"id":13833004831,"name":"Calle Estrella Zeta Doradus","lat":-17.4761678,"lon":-66.1666458},{"id":3675465528,"name":"Calle Estrella Zeta Doradus","lat":-17.4762099,"lon":-66.1665087},{"id":1617603331,"name":"Calle Estrella Zeta Doradus","lat":-17.4761628,"lon":-66.1654172}],"coordinates":[[-66.1910818,-17.3733272],[-66.1903392,-17.3737095],[-66.1899784,-17.3738892],[-66.1896854,-17.3740352],[-66.1898558,-17.3746342],[-66.1900376,-17.3752589],[-66.1901948,-17.3757979],[-66.1902154,-17.3758686],[-66.1903925,-17.3764765],[-66.190451,-17.3766774],[-66.1898763,-17.3770701],[-66.1892676,-17.3775087],[-66.1887473,-17.3779482],[-66.1886538,-17.3779965],[-66.1881294,-17.3782472],[-66.1876487,-17.3787214],[-66.187049,-17.3793527],[-66.1862742,-17.3801247],[-66.1862115,-17.3801643],[-66.1861151,-17.3801879],[-66.18615,-17.3803389],[-66.185179,-17.3803999],[-66.1848249,-17.3804222],[-66.1844581,-17.3804495],[-66.1837959,-17.3804989],[-66.1833762,-17.380533],[-66.1826231,-17.3805941],[-66.1817624,-17.3806487],[-66.1816754,-17.3806531],[-66.1814094,-17.3806644],[-66.1813401,-17.3806679],[-66.1808973,-17.38069],[-66.1808082,-17.3806945],[-66.1807071,-17.3806972],[-66.1802216,-17.3807104],[-66.1801735,-17.3807117],[-66.1794659,-17.3807203],[-66.179398,-17.3807221],[-66.1793466,-17.3807242],[-66.1787275,-17.3807487],[-66.1786767,-17.3807508],[-66.178623,-17.3807529],[-66.1780597,-17.3807765],[-66.1780221,-17.3807781],[-66.17796,-17.3807806],[-66.1779067,-17.3807828],[-66.1773726,-17.3808045],[-66.1773327,-17.3808061],[-66.1772865,-17.380808],[-66.1772281,-17.3808101],[-66.177193,-17.3808113],[-66.1767871,-17.3808257],[-66.1764987,-17.380836],[-66.1764294,-17.3808385],[-66.1763314,-17.3808424],[-66.1761749,-17.3808484],[-66.1756349,-17.3808691],[-66.1753939,-17.3808779],[-66.1747476,-17.3809074],[-66.1746795,-17.3809115],[-66.1743875,-17.3809292],[-66.1743119,-17.3809356],[-66.1742401,-17.3809421],[-66.1738964,-17.3798221],[-66.1737044,-17.3791675],[-66.1736677,-17.3790422],[-66.1733783,-17.3780483],[-66.1731849,-17.3773131],[-66.1731668,-17.3772449],[-66.1730391,-17.3767622],[-66.1729841,-17.3765713],[-66.1729444,-17.3764636],[-66.1729219,-17.3764217],[-66.1728893,-17.3763728],[-66.1728556,-17.37633],[-66.1728352,-17.3762943],[-66.1728207,-17.3762688],[-66.1727932,-17.3761637],[-66.1727458,-17.375927],[-66.1726105,-17.3753192],[-66.1726028,-17.3752823],[-66.1724521,-17.3745591],[-66.172413,-17.3743715],[-66.1722748,-17.3736682],[-66.1722761,-17.3736217],[-66.1722783,-17.373543],[-66.1721168,-17.3727222],[-66.1719891,-17.3720732],[-66.1719744,-17.3720341],[-66.1719539,-17.3720026],[-66.1719146,-17.3719866],[-66.1718879,-17.3719678],[-66.1718031,-17.3719645],[-66.171319,-17.3719969],[-66.1706729,-17.3720401],[-66.1699054,-17.3720863],[-66.1691006,-17.372137],[-66.168587,-17.3721724],[-66.1685115,-17.3721771],[-66.1684997,-17.3722013],[-66.1684825,-17.3722224],[-66.168454,-17.3722433],[-66.1684279,-17.3722539],[-66.1683999,-17.3722586],[-66.1683785,-17.3722582],[-66.1683542,-17.3722533],[-66.1683334,-17.3722451],[-66.1683144,-17.3722334],[-66.1682941,-17.3722145],[-66.1682794,-17.372193],[-66.1682184,-17.3721971],[-66.167996,-17.3722106],[-66.1676312,-17.3722381],[-66.1667194,-17.3722921],[-66.1660179,-17.3723376],[-66.1659353,-17.372343],[-66.1656278,-17.3723622],[-66.1651178,-17.372394],[-66.1646438,-17.3724236],[-66.1638303,-17.372476],[-66.163746,-17.3724797],[-66.1636543,-17.3724851],[-66.1632714,-17.3725106],[-66.1627848,-17.3725451],[-66.1626975,-17.3725484],[-66.1625774,-17.372555],[-66.162506,-17.3725594],[-66.1624945,-17.3725598],[-66.162333,-17.3725692],[-66.1608008,-17.3726716],[-66.1606043,-17.3726825],[-66.1605099,-17.3726889],[-66.1605013,-17.3726894],[-66.1591567,-17.3727758],[-66.1590778,-17.3727807],[-66.1589923,-17.372786],[-66.1589345,-17.3727896],[-66.1588691,-17.3727936],[-66.1584227,-17.3728199],[-66.1578797,-17.3728518],[-66.1572446,-17.3728891],[-66.1571999,-17.3728991],[-66.1571481,-17.3729298],[-66.157128,-17.3729915],[-66.1570942,-17.3730475],[-66.1570483,-17.3730951],[-66.1569993,-17.3731282],[-66.1569358,-17.3731547],[-66.1568749,-17.3731659],[-66.1568047,-17.3731596],[-66.1567491,-17.3731431],[-66.1567053,-17.3731178],[-66.1566654,-17.3730874],[-66.15663,-17.3730522],[-66.1566075,-17.3730242],[-66.156579,-17.3729771],[-66.156563,-17.3729415],[-66.1564845,-17.3729463],[-66.1557479,-17.3729988],[-66.1547966,-17.3730645],[-66.1547255,-17.3730695],[-66.1546618,-17.3730725],[-66.1546287,-17.3730741],[-66.1537792,-17.3731143],[-66.1536773,-17.3731211],[-66.1536062,-17.3731257],[-66.1535771,-17.3731276],[-66.152381,-17.3732095],[-66.1517028,-17.3732542],[-66.1511932,-17.3732875],[-66.1511413,-17.3732909],[-66.1510574,-17.373297],[-66.150952,-17.3733057],[-66.1509108,-17.3733086],[-66.1498037,-17.3733757],[-66.1497583,-17.3733886],[-66.1497138,-17.373412],[-66.1496988,-17.3734337],[-66.1496806,-17.3734483],[-66.149653,-17.3734654],[-66.149622,-17.3734759],[-66.1495885,-17.3734806],[-66.1495578,-17.3734759],[-66.149528,-17.3734659],[-66.1495013,-17.3734499],[-66.1494717,-17.3734192],[-66.1494245,-17.3734072],[-66.1493792,-17.3734028],[-66.1489025,-17.3734314],[-66.1485813,-17.3734507],[-66.1477566,-17.3735011],[-66.1471672,-17.3735404],[-66.1470543,-17.3735481],[-66.1467523,-17.3735688],[-66.1466779,-17.3735739],[-66.1459978,-17.3736203],[-66.1458624,-17.3736295],[-66.1454594,-17.3736551],[-66.1451928,-17.3736728],[-66.144613,-17.3737103],[-66.1445584,-17.3737138],[-66.1444795,-17.373719],[-66.1443518,-17.3737277],[-66.1438834,-17.3737566],[-66.1438205,-17.3737609],[-66.1434523,-17.3737837],[-66.1434139,-17.3737873],[-66.1433536,-17.3738017],[-66.1432825,-17.3738447],[-66.1432451,-17.3739292],[-66.1431855,-17.3740009],[-66.1431078,-17.3740548],[-66.1430179,-17.3740869],[-66.1429705,-17.3741295],[-66.1429314,-17.3741958],[-66.1428264,-17.3748707],[-66.1428132,-17.3749632],[-66.1428008,-17.3750357],[-66.1427526,-17.3753405],[-66.1426839,-17.3757746],[-66.1426736,-17.3758395],[-66.142619,-17.3762351],[-66.142601,-17.3763647],[-66.1425808,-17.3764786],[-66.1425494,-17.3767783],[-66.1425426,-17.3768431],[-66.1425381,-17.3768848],[-66.1425292,-17.3769365],[-66.1425277,-17.3769451],[-66.1425249,-17.3769601],[-66.1424276,-17.3773273],[-66.1424039,-17.3774192],[-66.1424088,-17.3774411],[-66.1424219,-17.377476],[-66.1424376,-17.3774945],[-66.1424518,-17.3775229],[-66.1424601,-17.3775508],[-66.1424632,-17.3775797],[-66.142461,-17.3776086],[-66.1424521,-17.3776461],[-66.1424359,-17.3776704],[-66.1424598,-17.3777399],[-66.1424536,-17.3778549],[-66.1424014,-17.3784476],[-66.1423772,-17.3787495],[-66.1423857,-17.3787904],[-66.1424117,-17.378833],[-66.1424539,-17.3788802],[-66.1425271,-17.3789172],[-66.1427305,-17.3789834],[-66.1429971,-17.3790674],[-66.1430493,-17.3790829],[-66.1430678,-17.379109],[-66.1430837,-17.3791368],[-66.1430966,-17.3791658],[-66.1431016,-17.3791891],[-66.1431024,-17.3792129],[-66.1430994,-17.3792366],[-66.1430676,-17.3793728],[-66.1430688,-17.3794137],[-66.1430776,-17.379442],[-66.1430937,-17.379472],[-66.1432028,-17.3796329],[-66.1441031,-17.3809425],[-66.1441407,-17.3809972],[-66.1442263,-17.3811247],[-66.1443213,-17.3812621],[-66.1443343,-17.3812809],[-66.1443962,-17.3813704],[-66.1450554,-17.3823239],[-66.1451665,-17.3824805],[-66.145265,-17.3826252],[-66.1462641,-17.3840939],[-66.1462906,-17.3841328],[-66.1463324,-17.3841942],[-66.1463585,-17.3842326],[-66.147463,-17.385856],[-66.1475139,-17.3859308],[-66.1475669,-17.3860074],[-66.147678,-17.3861681],[-66.1477159,-17.3862228],[-66.148064,-17.3867233],[-66.1483646,-17.3871554],[-66.1484094,-17.3872198],[-66.1485012,-17.3873491],[-66.1485192,-17.3873745],[-66.1486427,-17.3875508],[-66.1488419,-17.3878325],[-66.14901,-17.38807],[-66.1491698,-17.3882995],[-66.1493366,-17.3885389],[-66.1493179,-17.3886449],[-66.1492,-17.3892545],[-66.1491441,-17.3895439],[-66.1490107,-17.3902306],[-66.148919,-17.390703],[-66.1489091,-17.3907458],[-66.1488943,-17.3908244],[-66.1488864,-17.3908667],[-66.1487038,-17.3917663],[-66.1486906,-17.3918339],[-66.148651,-17.3919282],[-66.1486418,-17.3919718],[-66.1485877,-17.3922279],[-66.1485432,-17.392443],[-66.1485231,-17.3925402],[-66.1484738,-17.3927788],[-66.1484626,-17.3928329],[-66.147939,-17.3927435],[-66.1474334,-17.3926589],[-66.1473167,-17.3926404],[-66.1468937,-17.3925734],[-66.1468343,-17.3925626],[-66.146649,-17.3925276],[-66.1458099,-17.3923619],[-66.1453273,-17.392282],[-66.1451071,-17.3922456],[-66.1448295,-17.3921996],[-66.1445767,-17.3921581],[-66.1444097,-17.3921307],[-66.1443707,-17.3921243],[-66.1442415,-17.392103],[-66.1441346,-17.3920855],[-66.143713,-17.3920162],[-66.1436259,-17.3920019],[-66.1430857,-17.3919132],[-66.142807,-17.3918675],[-66.1427452,-17.3918573],[-66.1427214,-17.3919144],[-66.1423464,-17.3927549],[-66.1423273,-17.3927935],[-66.1419298,-17.3936747],[-66.1418779,-17.3937896],[-66.141893,-17.3937988],[-66.1419055,-17.393811],[-66.141917,-17.3938301],[-66.1419226,-17.3938534],[-66.1419205,-17.3938773],[-66.1419595,-17.3939217],[-66.1425597,-17.3946913],[-66.1429237,-17.3951433],[-66.1431094,-17.3953528],[-66.1431603,-17.3953705],[-66.1432088,-17.3953799],[-66.1432744,-17.3953894],[-66.1433432,-17.3954077],[-66.143388,-17.3954325],[-66.1434264,-17.3954721],[-66.1434691,-17.3954785],[-66.1448106,-17.3957061],[-66.14491,-17.395723],[-66.145397,-17.3958095],[-66.1455304,-17.3958332],[-66.1456435,-17.3958534],[-66.1457714,-17.3958753],[-66.1460447,-17.3959264],[-66.146439,-17.3960002],[-66.1471433,-17.3961317],[-66.1479763,-17.3962631],[-66.1480292,-17.3962721],[-66.1480855,-17.3962824],[-66.1482177,-17.3963066],[-66.1484781,-17.3963492],[-66.1485272,-17.3963716],[-66.1485507,-17.3964011],[-66.1488172,-17.3964487],[-66.1488961,-17.3964633],[-66.1489511,-17.3961794],[-66.1489979,-17.3961863],[-66.1502362,-17.3964175],[-66.1500348,-17.3975665],[-66.150021,-17.3976385],[-66.1500136,-17.3976877],[-66.1499487,-17.3984764],[-66.1499407,-17.3985529],[-66.1499065,-17.3990035],[-66.1498494,-17.3998668],[-66.1498455,-17.3999622],[-66.1497827,-17.4000289],[-66.1497047,-17.4001275],[-66.1490538,-17.4008033],[-66.1489857,-17.4009322],[-66.1489575,-17.4010462],[-66.1489528,-17.4011432],[-66.1489199,-17.4012872],[-66.1488898,-17.4013891],[-66.1488399,-17.4015357],[-66.1487501,-17.4017537],[-66.1487026,-17.4018377],[-66.1486934,-17.4018539],[-66.1486247,-17.4019797],[-66.1485157,-17.4021238],[-66.1484017,-17.4022469],[-66.1482901,-17.4023531],[-66.1481532,-17.4024646],[-66.1479772,-17.4025835],[-66.1477932,-17.4027075],[-66.1476973,-17.4027543],[-66.1473024,-17.402947],[-66.1470906,-17.403044],[-66.1470523,-17.4030773],[-66.1468865,-17.4032334],[-66.1467354,-17.4033443],[-66.1465602,-17.4035453],[-66.1462569,-17.4038813],[-66.1460246,-17.4041685],[-66.1459115,-17.4043358],[-66.1457908,-17.4045641],[-66.1456525,-17.4048461],[-66.1455747,-17.4050327],[-66.1455511,-17.4051795],[-66.1454776,-17.4054015],[-66.1454593,-17.4054669],[-66.1454202,-17.4056015],[-66.1453885,-17.4057459],[-66.1453712,-17.4058592],[-66.1453613,-17.4060238],[-66.1453676,-17.4061437],[-66.1453688,-17.4061755],[-66.1453732,-17.4062835],[-66.1453779,-17.4063067],[-66.1453793,-17.4063302],[-66.1454109,-17.4064432],[-66.1454431,-17.4065272],[-66.145499,-17.4066268],[-66.1455531,-17.4067126],[-66.1456262,-17.4067807],[-66.1460493,-17.4070827],[-66.1465755,-17.4074482],[-66.1468867,-17.4076105],[-66.14731,-17.4078445],[-66.1476893,-17.4081522],[-66.1477828,-17.4082396],[-66.1479561,-17.408399],[-66.1496415,-17.4094939],[-66.1498585,-17.4096343],[-66.1500246,-17.4097407],[-66.1501375,-17.4098088],[-66.1505664,-17.4100964],[-66.1517122,-17.4109129],[-66.1520489,-17.4111362],[-66.1522412,-17.4112605],[-66.1527414,-17.4115703],[-66.1539878,-17.4122767],[-66.1544409,-17.4125218],[-66.1546605,-17.4126411],[-66.1549246,-17.4127476],[-66.1551309,-17.4128636],[-66.1552374,-17.4129235],[-66.1554383,-17.4130287],[-66.1555542,-17.4130827],[-66.1556617,-17.4131113],[-66.1557665,-17.4131318],[-66.1557897,-17.4131358],[-66.1558256,-17.4131428],[-66.1564693,-17.4132469],[-66.1566019,-17.4132657],[-66.1567348,-17.4132782],[-66.1569082,-17.4132582],[-66.1572346,-17.4132093],[-66.1572919,-17.4132007],[-66.1572875,-17.4131399],[-66.1572089,-17.4120478],[-66.1563676,-17.4120812],[-66.1564244,-17.4124108],[-66.1564184,-17.4125091],[-66.1564168,-17.4125769],[-66.1564322,-17.4126673],[-66.1564789,-17.4129417],[-66.1565082,-17.4131032],[-66.1566016,-17.4136172],[-66.1566412,-17.4138349],[-66.1567186,-17.4142572],[-66.1567549,-17.4143521],[-66.1567981,-17.4145858],[-66.1568427,-17.414698],[-66.1569922,-17.4155388],[-66.1570091,-17.4156269],[-66.1570227,-17.4157096],[-66.157197,-17.4165706],[-66.157207,-17.4166281],[-66.1572232,-17.4167107],[-66.1573721,-17.4176234],[-66.1575465,-17.4187052],[-66.1576093,-17.4191214],[-66.157644,-17.4193561],[-66.1576803,-17.419601],[-66.1576838,-17.4196249],[-66.1576939,-17.4196932],[-66.1577032,-17.4197518],[-66.1577297,-17.4199188],[-66.1577703,-17.4201746],[-66.1577789,-17.4202297],[-66.157817,-17.4204683],[-66.1578206,-17.420491],[-66.1578264,-17.420528],[-66.1578847,-17.4209201],[-66.1579216,-17.4211652],[-66.1580254,-17.4217709],[-66.1580356,-17.4218393],[-66.1581657,-17.4226696],[-66.158183,-17.4227871],[-66.1582975,-17.4235739],[-66.1584775,-17.4245309],[-66.1587278,-17.4257287],[-66.1587448,-17.4257964],[-66.1590776,-17.4269849],[-66.1592252,-17.4275176],[-66.1593308,-17.4278755],[-66.15947,-17.4283455],[-66.1597484,-17.4293485],[-66.1597724,-17.4294201],[-66.1602312,-17.4309823],[-66.1602842,-17.4311843],[-66.1606818,-17.4325749],[-66.160935,-17.4334016],[-66.1611978,-17.434336],[-66.1613043,-17.434691],[-66.1614638,-17.4352578],[-66.1616469,-17.4359086],[-66.1621276,-17.4375533],[-66.1623772,-17.4385378],[-66.1624967,-17.4391593],[-66.162509,-17.439231],[-66.162514,-17.4392564],[-66.1625256,-17.4393328],[-66.1625589,-17.4395329],[-66.1625914,-17.4397426],[-66.162632,-17.4399582],[-66.1626572,-17.4400867],[-66.1628069,-17.4407881],[-66.162857,-17.4409845],[-66.1629144,-17.4411417],[-66.1634197,-17.4423163],[-66.1635294,-17.4425912],[-66.1636148,-17.4428661],[-66.1636835,-17.4431637],[-66.163743,-17.4434762],[-66.1638516,-17.4438302],[-66.1639603,-17.444157],[-66.1641999,-17.444916],[-66.1645422,-17.4459931],[-66.1645853,-17.4461312],[-66.1648063,-17.4468542],[-66.1649778,-17.4473238],[-66.1650357,-17.4474823],[-66.1650505,-17.4475473],[-66.1650712,-17.4476383],[-66.165116,-17.4479766],[-66.1652598,-17.4487022],[-66.1654498,-17.4494395],[-66.1656711,-17.450206],[-66.1658648,-17.450846],[-66.1660904,-17.4516332],[-66.1662155,-17.4519526],[-66.1662513,-17.4520492],[-66.1663435,-17.4523482],[-66.1665531,-17.4531358],[-66.1666086,-17.4533503],[-66.1667201,-17.4537351],[-66.1670523,-17.4547264],[-66.1670847,-17.4548232],[-66.1670923,-17.4548546],[-66.1671135,-17.4549547],[-66.1672792,-17.4557387],[-66.1674087,-17.4563612],[-66.167568,-17.4571273],[-66.1677161,-17.4578832],[-66.1677844,-17.4582475],[-66.1679761,-17.459016],[-66.168043,-17.4593077],[-66.1682508,-17.460091],[-66.1684189,-17.4607246],[-66.168494,-17.4610305],[-66.1686404,-17.4616269],[-66.1687377,-17.4620313],[-66.1688143,-17.4625332],[-66.1688348,-17.4627037],[-66.168873,-17.4631987],[-66.1688838,-17.4633261],[-66.168898,-17.4634552],[-66.1689439,-17.4637524],[-66.1690184,-17.4639966],[-66.1691841,-17.4644354],[-66.1692946,-17.4647281],[-66.169456,-17.465366],[-66.1697181,-17.4665464],[-66.1697719,-17.4668053],[-66.1696678,-17.4668225],[-66.1693264,-17.4667393],[-66.169217,-17.4667167],[-66.1690404,-17.4666823],[-66.1689225,-17.4666609],[-66.1682439,-17.4667363],[-66.1681291,-17.4667739],[-66.1681998,-17.4668662],[-66.1683281,-17.467149],[-66.168726,-17.4679873],[-66.1687415,-17.46801],[-66.1687841,-17.4680724],[-66.1688339,-17.4681627],[-66.1688713,-17.4682958],[-66.1689362,-17.4685344],[-66.1689562,-17.4687245],[-66.1689836,-17.4690715],[-66.1690229,-17.4692903],[-66.1690582,-17.4694113],[-66.1690969,-17.469492],[-66.1691974,-17.4696483],[-66.1693242,-17.469855],[-66.1694476,-17.4700634],[-66.1696051,-17.4703437],[-66.1696847,-17.4705155],[-66.1698651,-17.4711071],[-66.1699092,-17.471297],[-66.1699197,-17.4713894],[-66.1699548,-17.4715344],[-66.1700378,-17.4720146],[-66.1700695,-17.4721978],[-66.1700756,-17.4722594],[-66.1701889,-17.4728744],[-66.1702179,-17.4729153],[-66.1702853,-17.4733396],[-66.1701747,-17.4733205],[-66.1701042,-17.4733214],[-66.1700549,-17.4733337],[-66.1700257,-17.4733629],[-66.1700051,-17.4734245],[-66.1699674,-17.4736268],[-66.1699328,-17.4738992],[-66.1698937,-17.4743684],[-66.1697588,-17.4749734],[-66.1696499,-17.4755932],[-66.1695862,-17.4758761],[-66.16955,-17.4760679],[-66.1695108,-17.4762154],[-66.1693858,-17.4766995],[-66.1693468,-17.4768179],[-66.1692966,-17.4769167],[-66.1692337,-17.4770789],[-66.1692048,-17.4772178],[-66.1691722,-17.477365],[-66.1691518,-17.4774663],[-66.1691315,-17.477637],[-66.1691117,-17.4777071],[-66.1690762,-17.4777673],[-66.1690324,-17.477809],[-66.1689676,-17.4778358],[-66.1687192,-17.4779174],[-66.1687497,-17.4779632],[-66.1679785,-17.4781895],[-66.167374,-17.4772187],[-66.1670451,-17.4767878],[-66.1669946,-17.4767012],[-66.1667235,-17.4761439],[-66.1666458,-17.4761678],[-66.1665965,-17.4761829],[-66.1665087,-17.4762099],[-66.1663968,-17.4762204],[-66.1662517,-17.4762362],[-66.1660384,-17.4762061],[-66.1654172,-17.4761628]],"osmUrl":"https://www.openstreetmap.org/relation/9430329","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"ida","directionId":1},{"osmId":9430327,"ref":"311","name":"Trufi 311: Pampita Mejillones → Calle Canichana","from":"Pampita Mejillones","to":"Calle Canichana","description":"","tripHeadsign":"Calle Canichana","routeType":"bus","gtfsRouteId":56,"routeColor":"888888","stopCount":152,"stops":[{"id":1617603331,"name":"Calle Estrella Zeta Doradus","lat":-17.4761628,"lon":-66.1654172},{"id":1617603910,"name":"Calle Estrella Zeta Doradus","lat":-17.4762362,"lon":-66.1662517},{"id":13833004830,"name":"Calle Estrella Zeta Doradus","lat":-17.4761829,"lon":-66.1665965},{"id":1617603511,"name":"Calle Estrella Zeta Doradus y Avenida Golondrinera","lat":-17.4761439,"lon":-66.1667235},{"id":1617603705,"name":"Avenida Golondrinera","lat":-17.4772187,"lon":-66.167374},{"id":3675465583,"name":"Calle Alfalfa","lat":-17.4779632,"lon":-66.1687497},{"id":1617603633,"name":"Calle La Alfalfa","lat":-17.477809,"lon":-66.1690324},{"id":3675465576,"name":"Calle La Alfalfa","lat":-17.4777071,"lon":-66.1691117},{"id":1617603334,"name":"Calle La Alfalfa","lat":-17.477365,"lon":-66.1691722},{"id":3675465548,"name":"Calle La Alfalfa","lat":-17.4770789,"lon":-66.1692337},{"id":1617603777,"name":"Calle La Alfalfa","lat":-17.4768179,"lon":-66.1693468},{"id":3675465527,"name":"Calle La Alfalfa","lat":-17.4760679,"lon":-66.16955},{"id":1617603983,"name":"Calle La Alfalfa","lat":-17.4755932,"lon":-66.1696499},{"id":1617604019,"name":"Calle La Alfalfa","lat":-17.4738992,"lon":-66.1699328},{"id":1617603620,"name":"Calle La Alfalfa","lat":-17.4734245,"lon":-66.1700051},{"id":3668009744,"name":"Calle Estrella Crater","lat":-17.4733214,"lon":-66.1701042},{"id":1617603548,"name":"Calle Estrella Crater","lat":-17.4733396,"lon":-66.1702853},{"id":1496873947,"name":"Avenida Panamericana","lat":-17.4731143,"lon":-66.1709377},{"id":1496873986,"name":"Avenida Panamericana","lat":-17.47193,"lon":-66.1705687},{"id":12212934834,"name":"Avenida Panamericana","lat":-17.4715344,"lon":-66.1704904},{"id":1628726457,"name":"Avenida Panamericana","lat":-17.4703088,"lon":-66.170489},{"id":1496873941,"name":"Avenida Panamericana","lat":-17.4690651,"lon":-66.1701247},{"id":1496873980,"name":"Avenida Panamericana","lat":-17.466994,"lon":-66.1697005},{"id":1629103084,"name":"Avenida Panamericana","lat":-17.4654028,"lon":-66.1693653},{"id":1496873894,"name":"Avenida Panamericana","lat":-17.463734,"lon":-66.1688405},{"id":1626994943,"name":"Avenida Panamericana y Calle Estrella Brillante","lat":-17.4632288,"lon":-66.1687679},{"id":3658069723,"name":"Avenida Panamericana","lat":-17.4625596,"lon":-66.168719},{"id":1496873870,"name":"Avenida Panamericana","lat":-17.4617975,"lon":-66.1685718},{"id":1629103290,"name":"Avenida Panamericana","lat":-17.4607311,"lon":-66.1683163},{"id":1496873863,"name":"Avenida Panamericana","lat":-17.459716,"lon":-66.1680607},{"id":1496873879,"name":"Avenida Panamericana","lat":-17.4580131,"lon":-66.1676367},{"id":13456965414,"name":"Avenida Panamericana","lat":-17.4563853,"lon":-66.1673122},{"id":13456965418,"name":"Avenida Panamericana","lat":-17.4549741,"lon":-66.1670036},{"id":13456965417,"name":"Avenida Panamericana","lat":-17.454746,"lon":-66.1669463},{"id":8261043744,"name":"Avenida Panamericana","lat":-17.4537487,"lon":-66.16663},{"id":12421398931,"name":"Avenida Panamericana","lat":-17.4521064,"lon":-66.1661573},{"id":8261043748,"name":"Avenida Panamericana","lat":-17.4516474,"lon":-66.1660061},{"id":11058061009,"name":"Avenida Panamericana","lat":-17.4495083,"lon":-66.1653538},{"id":1496873856,"name":"Avenida Panamericana","lat":-17.4479927,"lon":-66.1650204},{"id":1499934314,"name":"Avenida Panamericana","lat":-17.4475066,"lon":-66.1649343},{"id":3647863722,"name":"Avenida Panamericana","lat":-17.4469012,"lon":-66.1647186},{"id":1499934393,"name":"Avenida Panamericana","lat":-17.444937,"lon":-66.1641045},{"id":1499934266,"name":"Avenida Panamericana y Calle Antonio Gallardo","lat":-17.4431733,"lon":-66.1635803},{"id":3647863374,"name":"Avenida Panamericana","lat":-17.4423511,"lon":-66.1633222},{"id":1499934297,"name":"Avenida Panamericana","lat":-17.4410111,"lon":-66.1627497},{"id":3647861704,"name":"Avenida Panamericana y Avenida Tamborada","lat":-17.4401042,"lon":-66.1625726},{"id":12456224875,"name":"Avenida Panamericana","lat":-17.4395634,"lon":-66.1624788},{"id":5314086309,"name":"Avenida Panamericana y Avenida Tamborada","lat":-17.439352,"lon":-66.1624373},{"id":13157367721,"name":"Avenida Panamericana","lat":-17.4391749,"lon":-66.1624025},{"id":3017390028,"name":"Avenida Panamericana y Calle Santa Bárbara","lat":-17.4385596,"lon":-66.162283},{"id":1617352116,"name":"Avenida Panamericana","lat":-17.4369547,"lon":-66.1618418},{"id":3311610866,"name":"Avenida Panamericana","lat":-17.4346979,"lon":-66.1611968},{"id":8995043198,"name":"Avenida Panamericana y Calle San Cipriano","lat":-17.433382,"lon":-66.1608134},{"id":2149899991,"name":"Avenida Panamericana","lat":-17.430977,"lon":-66.160128},{"id":1499934350,"name":"Avenida Panamericana","lat":-17.4293668,"lon":-66.1596591},{"id":3307473564,"name":"Avenida Panamericana y Avenida María Auxiliadora","lat":-17.4278287,"lon":-66.1592069},{"id":2149916017,"name":"Avenida Panamericana y Calle Manuel Virreira","lat":-17.4269791,"lon":-66.1589821},{"id":3307354191,"name":"Avenida Panamericana y Avenida Copacabana","lat":-17.425793,"lon":-66.1586595},{"id":1638831967,"name":"Avenida Panamericana y Avenida Copacabana","lat":-17.4257254,"lon":-66.158644},{"id":9191720004,"name":"Avenida Panamericana","lat":-17.4250012,"lon":-66.1584892},{"id":2022073888,"name":"Avenida Panamericana","lat":-17.4245278,"lon":-66.158388},{"id":1499934157,"name":"Avenida Panamericana y Calle José María Carrasco y Calle F. L. Guzman","lat":-17.4235733,"lon":-66.1582127},{"id":1499934196,"name":"Avenida Panamericana y Calle Manuel P. Laredo","lat":-17.4227889,"lon":-66.1580844},{"id":3306658845,"name":"Avenida Panamericana y Calle Manuel P. Laredo","lat":-17.4226868,"lon":-66.1580664},{"id":12519463518,"name":"Avenida Panamericana","lat":-17.4211406,"lon":-66.1575037},{"id":12519463525,"name":"Avenida Panamericana","lat":-17.4203442,"lon":-66.1574454},{"id":4679599408,"name":"Avenida Panamericana","lat":-17.4196975,"lon":-66.1574726},{"id":12519402024,"name":"Avenida de la Patria","lat":-17.4201804,"lon":-66.1578342},{"id":12589580108,"name":"Avenida de la Patria","lat":-17.4193771,"lon":-66.1589179},{"id":3305144370,"name":"Avenida de la Patria y Avenida Mártires de la Democracia","lat":-17.4185101,"lon":-66.1596062},{"id":10292314113,"name":"Avenida Mártires de la Democracia","lat":-17.4163464,"lon":-66.1591886},{"id":10292303700,"name":"Avenida Mártires de la Democracia","lat":-17.4152291,"lon":-66.1589706},{"id":12100007982,"name":"Avenida Mártires de la Democracia","lat":-17.4133941,"lon":-66.158619},{"id":1497947903,"name":"Avenida 6 de Agosto y Calle Lucia Alcocer","lat":-17.4134432,"lon":-66.1576174},{"id":2766300884,"name":"Avenida 6 de Agosto","lat":-17.4135223,"lon":-66.1566397},{"id":3709607002,"name":"Avenida 6 de Agosto","lat":-17.4134789,"lon":-66.1565119},{"id":13764559470,"name":"Avenida 6 de Agosto","lat":-17.4133502,"lon":-66.1557325},{"id":3709606955,"name":"Avenida 6 de Agosto","lat":-17.4132586,"lon":-66.1554401},{"id":9599936948,"name":"Avenida 6 de Agosto","lat":-17.4130283,"lon":-66.1550307},{"id":5610210827,"name":"Avenida 6 de Agosto","lat":-17.4114502,"lon":-66.152355},{"id":5610210841,"name":"Avenida 6 de Agosto","lat":-17.4099278,"lon":-66.1501557},{"id":2240938206,"name":"Avenida 6 de Agosto","lat":-17.4083666,"lon":-66.1477559},{"id":11789289640,"name":"Avenida 6 de Agosto","lat":-17.4076354,"lon":-66.1467095},{"id":12508280785,"name":"Avenida 6 de Agosto","lat":-17.4065874,"lon":-66.1451773},{"id":3017385037,"name":"Rotonda 6 de Agosto y Circuito Bolivia","lat":-17.4063923,"lon":-66.145018},{"id":9052272488,"name":"Innominada","lat":-17.4062128,"lon":-66.1449993},{"id":12777576108,"name":"Avenida Circuito Bolivia","lat":-17.4050327,"lon":-66.1455747},{"id":843385352,"name":"Avenida Circuito Bolivia","lat":-17.4038813,"lon":-66.1462569},{"id":8192368910,"name":"Avenida Circuito Bolivia","lat":-17.4030697,"lon":-66.1468785},{"id":598789673,"name":"Avenida Circuito Bolivia","lat":-17.4025344,"lon":-66.1470936},{"id":2031079468,"name":"Rotonda Circuito Bolivia y Oquendo","lat":-17.402008,"lon":-66.1471718},{"id":8192368884,"name":"Rotonda Circuito Bolivia y Oquendo y Avenida Oquendo","lat":-17.4019018,"lon":-66.1474157},{"id":4941281629,"name":"Avenida Oquendo","lat":-17.4016071,"lon":-66.1477981},{"id":8192368864,"name":"Avenida Oquendo","lat":-17.4008307,"lon":-66.1480179},{"id":648548704,"name":"Avenida Aroma y Avenida Oquendo y Avenida Guillermo Urquidi","lat":-17.3984547,"lon":-66.1484931},{"id":315031543,"name":"Avenida Oquendo y Avenida Guillermo Urquidi y Avenida Aroma","lat":-17.3983678,"lon":-66.148511},{"id":303217531,"name":"Avenida Oquendo y Calle Ladislao Cabrera","lat":-17.3961794,"lon":-66.1489511},{"id":8398265924,"name":"Avenida Oquendo","lat":-17.3940177,"lon":-66.1493561},{"id":698492413,"name":"Avenida Heroínas de la Coronilla y Avenida Oquendo","lat":-17.3910335,"lon":-66.1499518},{"id":303217665,"name":"Avenida Oquendo y Calle República de Ecuador y Avenida Aniceto Arce","lat":-17.3888061,"lon":-66.1504324},{"id":2327853062,"name":"Avenida Oquendo","lat":-17.3864986,"lon":-66.1509087},{"id":303217729,"name":"Avenida Oquendo y Calle José Pedro Borda","lat":-17.3839322,"lon":-66.1514217},{"id":2220379212,"name":"Plazuela Carlos Quintanilla","lat":-17.3825792,"lon":-66.151333},{"id":8355285957,"name":"Plazuela Carlos Quintanilla","lat":-17.3818471,"lon":-66.1512887},{"id":8355285965,"name":"Avenida Oquendo","lat":-17.3815555,"lon":-66.1518155},{"id":2220378894,"name":"Avenida Oquendo y Rotonda Reintegración Marítima","lat":-17.3801712,"lon":-66.1518541},{"id":1636883430,"name":"Avenida 23 de Marzo","lat":-17.3796621,"lon":-66.1511966},{"id":4406352470,"name":"Avenida 23 de Marzo","lat":-17.3787244,"lon":-66.1474435},{"id":1795293328,"name":"Avenida 23 de Marzo","lat":-17.3776016,"lon":-66.1425911},{"id":1795293390,"name":"Rotonda Cámara de Comercio","lat":-17.3777143,"lon":-66.1422463},{"id":1795293310,"name":"Rotonda Cámara de Comercio y Avenida General Galindo León","lat":-17.3774383,"lon":-66.1422947},{"id":2389107301,"name":"Avenida General Galindo León","lat":-17.3767615,"lon":-66.142481},{"id":2126674171,"name":"Avenida General Galindo León","lat":-17.3741261,"lon":-66.1428047},{"id":10830782197,"name":"Plaza Tarija","lat":-17.3735322,"lon":-66.1426742},{"id":1785473207,"name":"Plaza Tarija","lat":-17.3734795,"lon":-66.1431441},{"id":4139785892,"name":"Avenida América","lat":-17.3736146,"lon":-66.1446097},{"id":2126673510,"name":"Avenida América","lat":-17.3733174,"lon":-66.1491709},{"id":2126673387,"name":"Rotonda América y Melchor Urquidi","lat":-17.3732102,"lon":-66.1496169},{"id":2126673334,"name":"Avenida América y Avenida General José Manuel Pando","lat":-17.3731909,"lon":-66.1512083},{"id":676069628,"name":"Avenida América y Calle Pantaleón Dalence","lat":-17.3729757,"lon":-66.1546879},{"id":10035562403,"name":"Plaza Charles de Gaulle","lat":-17.3726232,"lon":-66.1567322},{"id":2126672468,"name":"Avenida América","lat":-17.372797,"lon":-66.1571777},{"id":2126672316,"name":"Avenida América","lat":-17.3725945,"lon":-66.1604978},{"id":598151867,"name":"Avenida América y Avenida Libertador Simón Bolívar","lat":-17.3724486,"lon":-66.1627243},{"id":851594833,"name":"Avenida América","lat":-17.3721954,"lon":-66.1667106},{"id":2851924355,"name":"Rotonda América y Ricardo Jaimes Freyre","lat":-17.3720287,"lon":-66.1684443},{"id":391738016,"name":"Avenida América","lat":-17.3718609,"lon":-66.1717893},{"id":2468433146,"name":"Rotonda América y Los Ceibos","lat":-17.3718839,"lon":-66.1721928},{"id":9005893470,"name":"Avenida Gabriel René Moreno","lat":-17.3730893,"lon":-66.1723079},{"id":9005870817,"name":"Avenida Gabriel René Moreno","lat":-17.3761385,"lon":-66.1729115},{"id":598179093,"name":"Avenida Gabriel René Moreno y Parque Demetrio Canelas","lat":-17.3791654,"lon":-66.1738031},{"id":598179090,"name":"Parque Demetrio Canelas y Avenida Gabriel René Moreno","lat":-17.3798175,"lon":-66.1739871},{"id":9021465330,"name":"Calle Casto Rojas","lat":-17.3809115,"lon":-66.1746795},{"id":598178923,"name":"Calle Casto Rojas","lat":-17.3808691,"lon":-66.1756349},{"id":598178893,"name":"Avenida Melchor Pérez de Olguín y Calle Casto Rojas","lat":-17.3808385,"lon":-66.1764294},{"id":12869588278,"name":"Calle Casto Rojas","lat":-17.3808113,"lon":-66.177193},{"id":12869588271,"name":"Calle Casto Rojas","lat":-17.3808061,"lon":-66.1773327},{"id":698492374,"name":"Calle Casto Rojas","lat":-17.3807806,"lon":-66.17796},{"id":7246421249,"name":"Calle Casto Rojas","lat":-17.3807529,"lon":-66.178623},{"id":7246421245,"name":"Calle Casto Rojas","lat":-17.3807242,"lon":-66.1793466},{"id":7246421241,"name":"Calle Casto Rojas","lat":-17.3807117,"lon":-66.1801735},{"id":7246421235,"name":"Calle Casto Rojas","lat":-17.38069,"lon":-66.1808973},{"id":698492362,"name":"Avenida Beijing y Calle Casto Rojas y Calle Chimané","lat":-17.3806531,"lon":-66.1816754},{"id":11048939251,"name":"Calle Chimané","lat":-17.380533,"lon":-66.1833762},{"id":698492174,"name":"Calle Chimané y Calle Araona","lat":-17.3804222,"lon":-66.1848249},{"id":1723594027,"name":"Calle Chipaya y Calle Chimané","lat":-17.3801879,"lon":-66.1861151},{"id":2147353030,"name":"Calle Chimané","lat":-17.3793527,"lon":-66.187049},{"id":3268355956,"name":"Calle Apurimak","lat":-17.3779965,"lon":-66.1886538},{"id":1807004183,"name":"Calle Apurimak","lat":-17.3770701,"lon":-66.1898763},{"id":682374724,"name":"Calle Chiriguano","lat":-17.3758686,"lon":-66.1902154},{"id":809705404,"name":"Calle 23 de Enero y Calle Chiriguano","lat":-17.3746342,"lon":-66.1898558},{"id":809705530,"name":"Calle Arawaqui y Calle Canichana","lat":-17.3733272,"lon":-66.1910818}],"coordinates":[[-66.1654172,-17.4761628],[-66.1660384,-17.4762061],[-66.1662517,-17.4762362],[-66.1663968,-17.4762204],[-66.1665087,-17.4762099],[-66.1665965,-17.4761829],[-66.1666458,-17.4761678],[-66.1667235,-17.4761439],[-66.1669946,-17.4767012],[-66.1670451,-17.4767878],[-66.167374,-17.4772187],[-66.1679785,-17.4781895],[-66.1687497,-17.4779632],[-66.1687192,-17.4779174],[-66.1689676,-17.4778358],[-66.1690324,-17.477809],[-66.1690762,-17.4777673],[-66.1691117,-17.4777071],[-66.1691315,-17.477637],[-66.1691518,-17.4774663],[-66.1691722,-17.477365],[-66.1692048,-17.4772178],[-66.1692337,-17.4770789],[-66.1692966,-17.4769167],[-66.1693468,-17.4768179],[-66.1693858,-17.4766995],[-66.1695108,-17.4762154],[-66.16955,-17.4760679],[-66.1695862,-17.4758761],[-66.1696499,-17.4755932],[-66.1697588,-17.4749734],[-66.1698937,-17.4743684],[-66.1699328,-17.4738992],[-66.1699674,-17.4736268],[-66.1700051,-17.4734245],[-66.1700257,-17.4733629],[-66.1700549,-17.4733337],[-66.1701042,-17.4733214],[-66.1701747,-17.4733205],[-66.1702853,-17.4733396],[-66.1704518,-17.4733789],[-66.1710095,-17.473485],[-66.1709377,-17.4731143],[-66.1708599,-17.4727378],[-66.1705687,-17.47193],[-66.1705178,-17.4717665],[-66.1704904,-17.4715344],[-66.1704844,-17.4712102],[-66.1705192,-17.4704745],[-66.170489,-17.4703088],[-66.1702595,-17.4695694],[-66.1701247,-17.4690651],[-66.1698468,-17.4677126],[-66.1697609,-17.4672946],[-66.1697005,-17.466994],[-66.1696678,-17.4668225],[-66.1693653,-17.4654028],[-66.1691956,-17.4647393],[-66.1689169,-17.4640161],[-66.1688405,-17.463734],[-66.1687719,-17.4633513],[-66.1687679,-17.4632288],[-66.1687517,-17.4629357],[-66.1687368,-17.4626875],[-66.168719,-17.4625596],[-66.1686933,-17.4623744],[-66.1685718,-17.4617975],[-66.1685355,-17.4616496],[-66.1683939,-17.4610561],[-66.1683163,-17.4607311],[-66.1681608,-17.4601136],[-66.1680607,-17.459716],[-66.1678774,-17.4590387],[-66.1676367,-17.4580131],[-66.1674914,-17.4572029],[-66.1673165,-17.4564052],[-66.1673122,-17.4563853],[-66.1671771,-17.4557574],[-66.1670036,-17.4549741],[-66.1669889,-17.454908],[-66.16698,-17.4548704],[-66.1669463,-17.454746],[-66.166882,-17.4545081],[-66.16663,-17.4537487],[-66.1665068,-17.4533454],[-66.1662598,-17.452411],[-66.1661573,-17.4521064],[-66.1661148,-17.4519869],[-66.1660061,-17.4516474],[-66.1657261,-17.4507254],[-66.1656072,-17.4503341],[-66.1653538,-17.4495083],[-66.1651677,-17.4486912],[-66.1650204,-17.4479927],[-66.1649691,-17.4476349],[-66.1649343,-17.4475066],[-66.1648822,-17.4473456],[-66.1647939,-17.4471129],[-66.1647186,-17.4469012],[-66.1644445,-17.4460233],[-66.1641045,-17.444937],[-66.1637968,-17.4440003],[-66.1636502,-17.4435107],[-66.1635803,-17.4431733],[-66.1635264,-17.4429327],[-66.1633222,-17.4423511],[-66.1632409,-17.442159],[-66.1628017,-17.4411565],[-66.1627497,-17.4410111],[-66.1627088,-17.4408476],[-66.1625726,-17.4401042],[-66.1625594,-17.4399713],[-66.1625169,-17.4397571],[-66.1624788,-17.4395634],[-66.1624428,-17.4393802],[-66.1624373,-17.439352],[-66.1624226,-17.4392693],[-66.1624025,-17.4391749],[-66.1623815,-17.439068],[-66.1623394,-17.4388509],[-66.162283,-17.4385596],[-66.1620252,-17.4375844],[-66.1618418,-17.4369547],[-66.1615523,-17.4359187],[-66.1613242,-17.4351293],[-66.1611968,-17.4346979],[-66.1608306,-17.4334329],[-66.1608134,-17.433382],[-66.1606499,-17.4328098],[-66.1605859,-17.4326096],[-66.160128,-17.430977],[-66.1596691,-17.4294012],[-66.1596591,-17.4293668],[-66.1596522,-17.4293377],[-66.1592806,-17.4280816],[-66.1592069,-17.4278287],[-66.1591867,-17.4277439],[-66.159143,-17.42756],[-66.1589821,-17.4269791],[-66.1586595,-17.425793],[-66.158644,-17.4257254],[-66.1584892,-17.4250012],[-66.158388,-17.4245278],[-66.1582127,-17.4235733],[-66.1580844,-17.4227889],[-66.1580664,-17.4226868],[-66.1579302,-17.4218446],[-66.1579202,-17.4217826],[-66.1578639,-17.421693],[-66.1575823,-17.4212723],[-66.1575037,-17.4211406],[-66.1574675,-17.4210563],[-66.1574266,-17.4209428],[-66.1574399,-17.4205262],[-66.1574408,-17.4204939],[-66.1574454,-17.4203442],[-66.1574461,-17.4203231],[-66.1574491,-17.4202251],[-66.1574669,-17.4198247],[-66.157468,-17.4198008],[-66.1574726,-17.4196975],[-66.1576939,-17.4196932],[-66.1577032,-17.4197518],[-66.1577297,-17.4199188],[-66.1577703,-17.4201746],[-66.1578342,-17.4201804],[-66.1581372,-17.4202082],[-66.158168,-17.4202218],[-66.158194,-17.4202415],[-66.1583777,-17.4200222],[-66.1589179,-17.4193771],[-66.1593498,-17.4188614],[-66.1594279,-17.4187681],[-66.1594519,-17.4187403],[-66.1595385,-17.4186399],[-66.1596062,-17.4185101],[-66.1595931,-17.4184422],[-66.1593794,-17.417334],[-66.1593696,-17.4172831],[-66.1593577,-17.4172216],[-66.1591886,-17.4163464],[-66.1591774,-17.4162817],[-66.1591668,-17.4162341],[-66.1589932,-17.4153413],[-66.1589815,-17.4152889],[-66.1589706,-17.4152291],[-66.1588046,-17.4143523],[-66.1587942,-17.4143014],[-66.1587855,-17.4142558],[-66.1587157,-17.4138945],[-66.158619,-17.4133941],[-66.1586138,-17.4133671],[-66.1586016,-17.4133033],[-66.1585485,-17.4133166],[-66.1576666,-17.4134365],[-66.1576174,-17.4134432],[-66.1573529,-17.4134808],[-66.1572733,-17.4134916],[-66.1568724,-17.4135461],[-66.1567602,-17.413552],[-66.156696,-17.413541],[-66.1566397,-17.4135223],[-66.1565119,-17.4134789],[-66.1564282,-17.413459],[-66.1559132,-17.4133788],[-66.1557916,-17.4133586],[-66.1557739,-17.4133559],[-66.1557325,-17.4133502],[-66.1556071,-17.4133243],[-66.1555752,-17.413315],[-66.1555265,-17.4133009],[-66.1554401,-17.4132586],[-66.1553389,-17.4132028],[-66.1553141,-17.4131891],[-66.1551014,-17.413072],[-66.1550519,-17.4130447],[-66.1550307,-17.4130283],[-66.1548269,-17.4128706],[-66.1543881,-17.4126227],[-66.1539241,-17.4123759],[-66.1528335,-17.4117654],[-66.152355,-17.4114502],[-66.1519473,-17.411181],[-66.1516553,-17.4109785],[-66.1505581,-17.4102049],[-66.1501557,-17.4099278],[-66.1499042,-17.409757],[-66.1495958,-17.4095555],[-66.149381,-17.4094152],[-66.1480614,-17.4085594],[-66.1477559,-17.4083666],[-66.1476685,-17.4083055],[-66.1472061,-17.4079846],[-66.1469674,-17.4078189],[-66.1467095,-17.4076354],[-66.1465021,-17.4074879],[-66.1457422,-17.4069606],[-66.1455086,-17.4068016],[-66.1452269,-17.4066194],[-66.1451773,-17.4065874],[-66.1451344,-17.4065596],[-66.1450723,-17.4065163],[-66.1450434,-17.406436],[-66.1450291,-17.406415],[-66.145018,-17.4063923],[-66.1450104,-17.4063684],[-66.1450064,-17.4063436],[-66.1450061,-17.4063168],[-66.1449993,-17.4062128],[-66.1450108,-17.406109],[-66.145293,-17.4055715],[-66.1454218,-17.4053073],[-66.1454853,-17.40517],[-66.1455747,-17.4050327],[-66.1456525,-17.4048461],[-66.1457908,-17.4045641],[-66.1459115,-17.4043358],[-66.1460246,-17.4041685],[-66.1462569,-17.4038813],[-66.1465602,-17.4035453],[-66.1467354,-17.4033443],[-66.1468116,-17.4031752],[-66.1468785,-17.4030697],[-66.1469238,-17.4029986],[-66.1469869,-17.4028497],[-66.147037,-17.4027185],[-66.1470624,-17.4026519],[-66.1470936,-17.4025344],[-66.147125,-17.4023666],[-66.1471298,-17.4021304],[-66.147153,-17.4020486],[-66.1471718,-17.402008],[-66.1471961,-17.4019791],[-66.1472339,-17.4019505],[-66.1472995,-17.4019107],[-66.1473653,-17.4018908],[-66.1474157,-17.4019018],[-66.1475057,-17.4018777],[-66.1475641,-17.401858],[-66.1476333,-17.4018178],[-66.1476868,-17.4017639],[-66.1477981,-17.4016071],[-66.1478917,-17.401321],[-66.1479899,-17.4009625],[-66.1480034,-17.4008948],[-66.1480179,-17.4008307],[-66.1481961,-17.3999523],[-66.1482116,-17.3998729],[-66.1483229,-17.3993423],[-66.1483573,-17.3991716],[-66.1483945,-17.3989818],[-66.1484931,-17.3984547],[-66.148511,-17.3983678],[-66.1485231,-17.3983088],[-66.1486874,-17.3975094],[-66.1486986,-17.3974593],[-66.1487112,-17.3973963],[-66.1487809,-17.397047],[-66.1488158,-17.396872],[-66.1488764,-17.3965683],[-66.1488961,-17.3964633],[-66.1489511,-17.3961794],[-66.1489617,-17.3961286],[-66.1490339,-17.3957809],[-66.1491557,-17.3951858],[-66.149167,-17.3951292],[-66.1491829,-17.3950604],[-66.1492372,-17.3947783],[-66.1493039,-17.3944315],[-66.1493561,-17.3941416],[-66.1493544,-17.3940925],[-66.1493561,-17.3940177],[-66.1495434,-17.3931048],[-66.1495557,-17.3930522],[-66.1495696,-17.3929855],[-66.1497525,-17.3920777],[-66.1497628,-17.3920265],[-66.1497737,-17.3919674],[-66.1498584,-17.3915058],[-66.1499382,-17.391094],[-66.1499518,-17.3910335],[-66.1499667,-17.3909479],[-66.1499781,-17.390874],[-66.1500966,-17.3902689],[-66.1501828,-17.3898291],[-66.1501946,-17.3897684],[-66.1502534,-17.389679],[-66.1502971,-17.3894661],[-66.1504185,-17.3888752],[-66.1504324,-17.3888061],[-66.1504479,-17.3887263],[-66.1505623,-17.3882062],[-66.1506379,-17.3877484],[-66.1506511,-17.3876967],[-66.1506843,-17.3875092],[-66.150719,-17.3873537],[-66.1507318,-17.3872969],[-66.1508889,-17.3866008],[-66.1508979,-17.3865461],[-66.1509087,-17.3864986],[-66.1510931,-17.3855979],[-66.1511089,-17.3855066],[-66.1511654,-17.3852221],[-66.1511784,-17.3851568],[-66.1511861,-17.3851239],[-66.1512256,-17.3849194],[-66.1514041,-17.384021],[-66.1514094,-17.3839941],[-66.1514217,-17.3839322],[-66.1514374,-17.3838563],[-66.1516198,-17.3829753],[-66.1516399,-17.3828747],[-66.1516498,-17.382809],[-66.1516597,-17.3827433],[-66.1515937,-17.3827285],[-66.1515298,-17.3827068],[-66.1514689,-17.3826784],[-66.1513972,-17.3826334],[-66.151333,-17.3825792],[-66.1512774,-17.3825169],[-66.1512315,-17.3824478],[-66.1512051,-17.3823717],[-66.1511821,-17.3822779],[-66.1511753,-17.3821817],[-66.1511847,-17.3820858],[-66.1512087,-17.3819921],[-66.1512426,-17.3819165],[-66.1512887,-17.3818471],[-66.1513456,-17.3817854],[-66.151412,-17.381733],[-66.1514719,-17.3816993],[-66.151496,-17.3816858],[-66.1515939,-17.3816542],[-66.1516628,-17.3816452],[-66.151752,-17.3816394],[-66.1517908,-17.381598],[-66.1518155,-17.3815555],[-66.1518605,-17.3811894],[-66.1518725,-17.3810714],[-66.1518797,-17.3810005],[-66.1518865,-17.3809636],[-66.1518945,-17.3809201],[-66.1519208,-17.3806937],[-66.1519222,-17.3805369],[-66.151916,-17.3804292],[-66.151894,-17.3803402],[-66.1518541,-17.3801712],[-66.1518253,-17.3801178],[-66.151804,-17.3800653],[-66.1517047,-17.3799634],[-66.1516382,-17.3798932],[-66.1515828,-17.3798392],[-66.1515192,-17.3797992],[-66.1514258,-17.3797591],[-66.15132,-17.3797085],[-66.1511966,-17.3796621],[-66.1510912,-17.3796258],[-66.1508372,-17.3795669],[-66.1500921,-17.3793975],[-66.1499797,-17.3793649],[-66.1489571,-17.3791208],[-66.1483303,-17.3789624],[-66.1480945,-17.3789074],[-66.1478468,-17.3788225],[-66.1474435,-17.3787244],[-66.1463336,-17.3784544],[-66.145563,-17.3782669],[-66.1447283,-17.3780638],[-66.1433548,-17.3777146],[-66.1432422,-17.3777204],[-66.1428474,-17.3776263],[-66.1427,-17.3776012],[-66.1426684,-17.3775982],[-66.1426367,-17.3775952],[-66.1425911,-17.3776016],[-66.1425515,-17.3776146],[-66.1425118,-17.3776276],[-66.1424521,-17.3776461],[-66.1424359,-17.3776704],[-66.1424103,-17.3776951],[-66.1423795,-17.3777153],[-66.1423309,-17.3777278],[-66.1422795,-17.377725],[-66.1422463,-17.3777143],[-66.1422199,-17.3776949],[-66.1421909,-17.3776639],[-66.1421731,-17.3776255],[-66.1421671,-17.377586],[-66.1421707,-17.3775543],[-66.1421773,-17.3775296],[-66.1421934,-17.3774952],[-66.142222,-17.3774681],[-66.1422554,-17.3774507],[-66.1422947,-17.3774383],[-66.1423194,-17.3774203],[-66.1423346,-17.3774054],[-66.1423592,-17.3773105],[-66.14246,-17.3769444],[-66.1424636,-17.3769289],[-66.142464,-17.3769249],[-66.1424703,-17.3768683],[-66.1424748,-17.3768274],[-66.142481,-17.3767615],[-66.1425182,-17.376325],[-66.1425282,-17.3762196],[-66.1425928,-17.3757608],[-66.1426542,-17.3753253],[-66.1426953,-17.375031],[-66.1427052,-17.3749628],[-66.1427183,-17.3748676],[-66.142819,-17.3741845],[-66.1428047,-17.3741261],[-66.1427764,-17.3740572],[-66.1426805,-17.3739877],[-66.1426346,-17.3739395],[-66.1426047,-17.373879],[-66.1425975,-17.3738446],[-66.1425861,-17.3737841],[-66.1425906,-17.3736961],[-66.1426187,-17.3736122],[-66.142654,-17.3735557],[-66.1426742,-17.3735322],[-66.1427001,-17.3735067],[-66.1427463,-17.3734725],[-66.1427978,-17.3734461],[-66.1428532,-17.373428],[-66.1429065,-17.3734193],[-66.1429606,-17.3734184],[-66.1430141,-17.3734253],[-66.143066,-17.3734399],[-66.1431441,-17.3734795],[-66.1432095,-17.3735363],[-66.1432581,-17.3736067],[-66.1433648,-17.3736706],[-66.1434091,-17.3736789],[-66.143743,-17.373666],[-66.1438154,-17.3736615],[-66.1443457,-17.3736292],[-66.1445029,-17.3736196],[-66.1446097,-17.3736146],[-66.1456453,-17.3735474],[-66.1458534,-17.3735342],[-66.146669,-17.3734776],[-66.1467391,-17.3734727],[-66.1468978,-17.3734617],[-66.1470447,-17.3734515],[-66.14716,-17.3734435],[-66.1477354,-17.3734036],[-66.1485729,-17.3733532],[-66.1491709,-17.3733174],[-66.1493762,-17.3733059],[-66.1494179,-17.3732966],[-66.1494654,-17.3732778],[-66.1494829,-17.373254],[-66.1495055,-17.3732341],[-66.1495291,-17.3732207],[-66.1495551,-17.3732119],[-66.1495828,-17.3732079],[-66.1496169,-17.3732102],[-66.14965,-17.3732204],[-66.1496795,-17.3732379],[-66.1497031,-17.3732611],[-66.1497561,-17.3732748],[-66.1497987,-17.3732787],[-66.1505133,-17.3732341],[-66.1509548,-17.3732066],[-66.1510593,-17.3732],[-66.1511738,-17.373193],[-66.1512083,-17.3731909],[-66.1514426,-17.3731741],[-66.1524613,-17.373111],[-66.1534191,-17.3730516],[-66.1535724,-17.3730421],[-66.1536725,-17.3730353],[-66.1537516,-17.3730299],[-66.1537745,-17.3730284],[-66.1546202,-17.3729792],[-66.1546879,-17.3729757],[-66.1547572,-17.3729707],[-66.1547911,-17.3729683],[-66.1564764,-17.3728483],[-66.156552,-17.3728389],[-66.1565694,-17.3727842],[-66.1565973,-17.3727336],[-66.1566347,-17.3726889],[-66.1566802,-17.3726517],[-66.1567322,-17.3726232],[-66.1567699,-17.3726096],[-66.1568092,-17.3726006],[-66.1568493,-17.3725972],[-66.1569111,-17.3726043],[-66.1569703,-17.3726229],[-66.1570244,-17.3726523],[-66.1570714,-17.3726913],[-66.1571094,-17.3727384],[-66.1571284,-17.3727719],[-66.1571777,-17.372797],[-66.15724,-17.372803],[-66.158928,-17.3726913],[-66.1589853,-17.3726882],[-66.1590701,-17.3726834],[-66.1591482,-17.3726788],[-66.1592834,-17.372671],[-66.159475,-17.3726595],[-66.1597268,-17.3726458],[-66.1604978,-17.3725945],[-66.1605812,-17.3725908],[-66.1607827,-17.3725763],[-66.160793,-17.3725756],[-66.1608853,-17.3725699],[-66.1610422,-17.3725601],[-66.1616667,-17.3725213],[-66.1625305,-17.372462],[-66.1626071,-17.3724567],[-66.1627243,-17.3724486],[-66.1628076,-17.3724444],[-66.1628193,-17.3724437],[-66.1629565,-17.3724339],[-66.1636863,-17.3723902],[-66.1637796,-17.372384],[-66.1638592,-17.3723806],[-66.1650447,-17.372305],[-66.1659248,-17.37225],[-66.1660108,-17.372244],[-66.1667106,-17.3721954],[-66.1676251,-17.3721398],[-66.1682109,-17.3720994],[-66.1682737,-17.3720962],[-66.1682884,-17.3720694],[-66.1683082,-17.3720482],[-66.1683427,-17.3720274],[-66.1683728,-17.3720193],[-66.168404,-17.3720184],[-66.1684443,-17.3720287],[-66.1684619,-17.372038],[-66.1684843,-17.3720562],[-66.168504,-17.3720828],[-66.1685775,-17.3720773],[-66.1690899,-17.3720399],[-66.1693731,-17.3720204],[-66.169897,-17.3719842],[-66.1706584,-17.3719374],[-66.1712894,-17.3718971],[-66.1717893,-17.3718609],[-66.1718897,-17.3718427],[-66.1719161,-17.3718232],[-66.1719629,-17.3718075],[-66.1720118,-17.3717993],[-66.1720614,-17.3717986],[-66.1721105,-17.3718056],[-66.1721498,-17.3718258],[-66.1721781,-17.3718503],[-66.1721928,-17.3718839],[-66.1721911,-17.3719202],[-66.1721735,-17.3719525],[-66.1721483,-17.3719742],[-66.1721349,-17.3720143],[-66.1721286,-17.3720463],[-66.1721315,-17.3720814],[-66.1722429,-17.3726995],[-66.1723033,-17.373062],[-66.1723079,-17.3730893],[-66.1722942,-17.373158],[-66.1723824,-17.373613],[-66.1724153,-17.3736561],[-66.1725425,-17.3743935],[-66.1725697,-17.3745408],[-66.1727039,-17.3752682],[-66.1728417,-17.3760168],[-66.1728693,-17.3760803],[-66.1728871,-17.3761108],[-66.1729115,-17.3761385],[-66.1729355,-17.3761751],[-66.1729745,-17.3762815],[-66.1729959,-17.3763378],[-66.1730209,-17.376452],[-66.1732381,-17.3772184],[-66.1732447,-17.3772416],[-66.1732646,-17.3773106],[-66.1734727,-17.3780442],[-66.1737696,-17.3790466],[-66.1738031,-17.3791654],[-66.1739871,-17.3798175],[-66.1743119,-17.3809356],[-66.1743875,-17.3809292],[-66.1746795,-17.3809115],[-66.1747476,-17.3809074],[-66.1753939,-17.3808779],[-66.1756349,-17.3808691],[-66.1761749,-17.3808484],[-66.1763314,-17.3808424],[-66.1764294,-17.3808385],[-66.1764987,-17.380836],[-66.1767871,-17.3808257],[-66.177193,-17.3808113],[-66.1772281,-17.3808101],[-66.1772865,-17.380808],[-66.1773327,-17.3808061],[-66.1773726,-17.3808045],[-66.1779067,-17.3807828],[-66.17796,-17.3807806],[-66.1780221,-17.3807781],[-66.1780597,-17.3807765],[-66.178623,-17.3807529],[-66.1786767,-17.3807508],[-66.1787275,-17.3807487],[-66.1793466,-17.3807242],[-66.179398,-17.3807221],[-66.1794659,-17.3807203],[-66.1801735,-17.3807117],[-66.1802216,-17.3807104],[-66.1807071,-17.3806972],[-66.1808082,-17.3806945],[-66.1808973,-17.38069],[-66.1813401,-17.3806679],[-66.1814094,-17.3806644],[-66.1816754,-17.3806531],[-66.1817624,-17.3806487],[-66.1826231,-17.3805941],[-66.1833762,-17.380533],[-66.1837959,-17.3804989],[-66.1844581,-17.3804495],[-66.1848249,-17.3804222],[-66.185179,-17.3803999],[-66.18615,-17.3803389],[-66.1861151,-17.3801879],[-66.1862115,-17.3801643],[-66.1862742,-17.3801247],[-66.187049,-17.3793527],[-66.1876487,-17.3787214],[-66.1881294,-17.3782472],[-66.1886538,-17.3779965],[-66.1887473,-17.3779482],[-66.1892676,-17.3775087],[-66.1898763,-17.3770701],[-66.190451,-17.3766774],[-66.1903925,-17.3764765],[-66.1902154,-17.3758686],[-66.1901948,-17.3757979],[-66.1900376,-17.3752589],[-66.1898558,-17.3746342],[-66.1896854,-17.3740352],[-66.1899784,-17.3738892],[-66.1903392,-17.3737095],[-66.1910818,-17.3733272]],"osmUrl":"https://www.openstreetmap.org/relation/9430327","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"vuelta","directionId":0}]}]}</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+(function () {
+  const REPORT = JSON.parse(document.getElementById('report-data').textContent);
+  const STORAGE_KEY = 'trufi-validation-' + REPORT.slug;
+  const VIS_KEY = 'trufi-vis-' + REPORT.slug;
+
+  const HIGHLIGHT_COLOR = '#f59e0b';
+  const DIM_COLOR = '#94a3b8';
+  const STOP_RADIUS = 2;
+  const STOP_RADIUS_SELECTED = 4;
+
+  function loadValidation() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveValidation(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    updateProgress();
+  }
+  function loadVisibility() {
+    try { return JSON.parse(localStorage.getItem(VIS_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveVisibility(data) {
+    localStorage.setItem(VIS_KEY, JSON.stringify(data));
+  }
+
+  const validation = loadValidation();
+  const visibility = loadVisibility();
+  let selectedOsmId = null;
+
+  const overviewMap = L.map('overview-map', { scrollWheelZoom: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(overviewMap);
+  overviewMap.setView([-17.39, -66.16], 12);
+
+  const variantLayers = {};
+  const routeMaps = {};
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  }
+  function hexColor(c) { return c && String(c).length >= 3 ? '#' + String(c).replace('#','') : '#64748b'; }
+  function coordsToLatLngs(coords) {
+    return coords.map(function (c) { return [c[1], c[0]]; });
+  }
+  function dirLabelHtml(label) {
+    if (label === 'ida') return '<span class="dir-badge dir-ida">→ Ida</span>';
+    if (label === 'vuelta') return '<span class="dir-badge dir-vuelta">← Vuelta</span>';
+    return '<span class="dir-badge dir-unico">↔ Único</span>';
+  }
+  function dirLabelText(label) {
+    if (label === 'ida') return 'Ida';
+    if (label === 'vuelta') return 'Vuelta';
+    return 'Único';
+  }
+  function buildPopup(v) {
+    return dirLabelHtml(v.directionLabel) +
+      ' <strong>' + esc(v.ref) + '</strong><br>' +
+      esc(v.from) + ' → ' + esc(v.to) +
+      (v.description ? '<br><em>' + esc(v.description) + '</em>' : '') +
+      '<br><a href="' + v.osmUrl + '" target="_blank" rel="noopener">Ver en OSM</a>';
+  }
+  function addDirectionArrow(layerGroup, latlngs, color) {
+    if (latlngs.length < 2) return null;
+    var idx = Math.min(Math.floor(latlngs.length * 0.75), latlngs.length - 1);
+    var p1 = latlngs[Math.max(0, idx - 1)];
+    var p2 = latlngs[idx];
+    var angle = Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180 / Math.PI;
+    var marker = L.marker(p2, {
+      icon: L.divIcon({
+        className: 'dir-arrow-icon',
+        html: '<div style="transform:rotate(' + angle + 'deg);color:' + color + ';font-weight:bold">▶</div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      }),
+      interactive: false
+    });
+    marker.addTo(layerGroup);
+    return marker;
+  }
+
+  function styleVariant(osmId) {
+    var entry = variantLayers[osmId];
+    if (!entry || !entry.visible) return;
+    var v = entry.variant;
+    var isSelected = selectedOsmId === osmId;
+    var baseColor = hexColor(v.routeColor || entry.refColor);
+
+    if (isSelected) {
+      entry.line.setStyle({ color: HIGHLIGHT_COLOR, weight: 6, opacity: 1 });
+      if (entry.arrow) entry.arrow.setOpacity(1);
+    } else if (selectedOsmId !== null) {
+      entry.line.setStyle({ color: DIM_COLOR, weight: 3, opacity: 0.35 });
+      if (entry.arrow) entry.arrow.setOpacity(0.3);
+    } else {
+      entry.line.setStyle({ color: baseColor, weight: 4, opacity: 0.85 });
+      if (entry.arrow) entry.arrow.setOpacity(0.9);
+    }
+
+    entry.stops.clearLayers();
+    if (isSelected && v.stops && v.stops.length) {
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], {
+          radius: STOP_RADIUS_SELECTED,
+          color: HIGHLIGHT_COLOR,
+          fillColor: HIGHLIGHT_COLOR,
+          fillOpacity: 0.85,
+          weight: 1
+        }).bindPopup(esc(s.name)).addTo(entry.stops);
+      });
+    }
+  }
+
+  function refreshAllStyles() {
+    Object.keys(variantLayers).forEach(function (id) { styleVariant(Number(id)); });
+    var anyVisible = Object.values(variantLayers).some(function (e) { return e.visible; });
+    document.getElementById('map-hint').style.display = anyVisible ? 'none' : 'block';
+    var n = Object.values(variantLayers).filter(function (e) { return e.visible; }).length;
+    var status = n + ' ruta(s) visible(s)';
+    if (selectedOsmId && variantLayers[selectedOsmId]) {
+      var sv = variantLayers[selectedOsmId].variant;
+      status += ' · Seleccionada: ' + dirLabelText(sv.directionLabel) + ' ' + sv.from + ' → ' + sv.to;
+    }
+    document.getElementById('map-status').textContent = status;
+  }
+
+  function selectVariant(osmId) {
+    selectedOsmId = osmId;
+    document.querySelectorAll('.vis-variant').forEach(function (el) {
+      el.classList.toggle('selected', Number(el.dataset.osmId) === osmId);
+    });
+    refreshAllStyles();
+    var entry = variantLayers[osmId];
+    if (entry && entry.line) {
+      overviewMap.fitBounds(entry.line.getBounds(), { padding: [48, 48] });
+    }
+  }
+
+  function setVariantVisible(osmId, visible) {
+    var entry = variantLayers[osmId];
+    if (!entry) return;
+    entry.visible = visible;
+    visibility[osmId] = visible;
+    saveVisibility(visibility);
+
+    if (visible) {
+      entry.group.addTo(overviewMap);
+    } else {
+      overviewMap.removeLayer(entry.group);
+      if (selectedOsmId === osmId) selectedOsmId = null;
+    }
+    var cb = document.querySelector('.vis-variant[data-osm-id="' + osmId + '"] input');
+    if (cb) cb.checked = visible;
+    refreshAllStyles();
+  }
+
+  REPORT.refGroups.forEach(function (group) {
+    var refColor = hexColor(group.routeColor);
+
+    group.variants.forEach(function (v) {
+      if (!v.coordinates || !v.coordinates.length) return;
+
+      var latlngs = coordsToLatLngs(v.coordinates);
+      var groupLayer = L.layerGroup();
+      var stopsLayer = L.layerGroup();
+      var line = L.polyline(latlngs, { color: refColor, weight: 4, opacity: 0.85 });
+      line.bindPopup(buildPopup(v));
+      line.on('click', function (e) {
+        L.DomEvent.stopPropagation(e);
+        if (!variantLayers[v.osmId].visible) setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+      });
+      line.addTo(groupLayer);
+      var arrow = addDirectionArrow(groupLayer, latlngs, refColor);
+      stopsLayer.addTo(groupLayer);
+
+      variantLayers[v.osmId] = {
+        osmId: v.osmId,
+        ref: group.ref,
+        refColor: group.routeColor,
+        variant: v,
+        group: groupLayer,
+        line: line,
+        stops: stopsLayer,
+        arrow: arrow,
+        visible: false
+      };
+    });
+  });
+
+  var visList = document.getElementById('visibility-list');
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = document.createElement('div');
+    refBlock.className = 'vis-ref-group';
+    refBlock.dataset.ref = group.ref;
+
+    var refHead = document.createElement('div');
+    refHead.className = 'vis-ref-head';
+    var refCb = document.createElement('input');
+    refCb.type = 'checkbox';
+    refCb.title = 'Mostrar/ocultar línea ' + group.ref;
+    refHead.appendChild(refCb);
+    refHead.appendChild(document.createTextNode(' Línea ' + group.ref + ' (' + group.variants.length + ')'));
+    refBlock.appendChild(refHead);
+
+    group.variants.forEach(function (v) {
+      if (!variantLayers[v.osmId]) return;
+      var row = document.createElement('label');
+      row.className = 'vis-variant';
+      row.dataset.osmId = String(v.osmId);
+      row.dataset.search = [v.ref, v.from, v.to, v.description, v.name].join(' ').toLowerCase();
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!visibility[v.osmId];
+      if (cb.checked) setVariantVisible(v.osmId, true);
+
+      var text = document.createElement('div');
+      text.className = 'vis-variant-text';
+      text.innerHTML = dirLabelHtml(v.directionLabel) +
+        '<strong>' + esc(v.from) + ' → ' + esc(v.to) + '</strong>' +
+        (v.description ? '<br><span style="color:var(--muted)">' + esc(v.description) + '</span>' : '');
+
+      row.appendChild(cb);
+      row.appendChild(text);
+      refBlock.appendChild(row);
+
+      cb.addEventListener('change', function () {
+        setVariantVisible(v.osmId, cb.checked);
+        updateRefCheckbox(refCb, group);
+      });
+      row.addEventListener('click', function (e) {
+        if (e.target === cb) return;
+        selectVariant(v.osmId);
+        if (!cb.checked) { cb.checked = true; setVariantVisible(v.osmId, true); updateRefCheckbox(refCb, group); }
+      });
+    });
+
+    refCb.addEventListener('change', function () {
+      group.variants.forEach(function (v) {
+        if (variantLayers[v.osmId]) setVariantVisible(v.osmId, refCb.checked);
+      });
+      refBlock.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
+    });
+
+    refHead.addEventListener('click', function (e) {
+      if (e.target !== refCb) { refCb.checked = !refCb.checked; refCb.dispatchEvent(new Event('change')); }
+    });
+
+    visList.appendChild(refBlock);
+  });
+
+  function updateRefCheckbox(refCb, group) {
+    var checked = group.variants.filter(function (v) { return variantLayers[v.osmId] && variantLayers[v.osmId].visible; }).length;
+    refCb.checked = checked === group.variants.length;
+    refCb.indeterminate = checked > 0 && checked < group.variants.length;
+  }
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = visList.querySelector('[data-ref="' + group.ref.replace(/"/g, '') + '"]');
+    if (!refBlock) return;
+    var refCb = refBlock.querySelector('.vis-ref-head input');
+    updateRefCheckbox(refCb, group);
+  });
+
+  document.getElementById('vis-all').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), true); });
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = true; c.indeterminate = false; });
+  });
+  document.getElementById('vis-none').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), false); });
+    selectedOsmId = null;
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; c.indeterminate = false; });
+    refreshAllStyles();
+  });
+  document.getElementById('fit-visible').addEventListener('click', function () {
+    var bounds = L.latLngBounds([]);
+    Object.values(variantLayers).forEach(function (e) {
+      if (e.visible && e.line) e.line.getLatLngs().forEach(function (ll) {
+        if (Array.isArray(ll[0])) ll.forEach(function (p) { bounds.extend(p); });
+        else bounds.extend(ll);
+      });
+    });
+    if (bounds.isValid()) overviewMap.fitBounds(bounds, { padding: [32, 32] });
+  });
+
+  overviewMap.on('click', function () {
+    selectedOsmId = null;
+    document.querySelectorAll('.vis-variant.selected').forEach(function (el) { el.classList.remove('selected'); });
+    refreshAllStyles();
+  });
+
+  var container = document.getElementById('routes-container');
+  REPORT.refGroups.forEach(function (group) {
+    var card = document.createElement('article');
+    card.className = 'route-card';
+    card.dataset.ref = group.ref;
+
+    var header = document.createElement('div');
+    header.className = 'route-header';
+    header.innerHTML =
+      '<span class="route-badge">' + esc(group.ref) + '</span>' +
+      '<span class="route-title">' + esc(group.routeLongName || group.ref) + '</span>' +
+      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>';
+    card.appendChild(header);
+
+    var body = document.createElement('div');
+    body.className = 'route-body';
+    var grid = document.createElement('div');
+    grid.className = 'route-grid';
+
+    var mapDiv = document.createElement('div');
+    mapDiv.className = 'route-map';
+    grid.appendChild(mapDiv);
+
+    var variantsCol = document.createElement('div');
+    group.variants.forEach(function (v) {
+      var block = document.createElement('div');
+      block.className = 'variant-block';
+      block.dataset.osmId = String(v.osmId);
+      block.dataset.search = [v.ref, v.name, v.from, v.to, v.description].join(' ').toLowerCase();
+
+      var statusCls = v.status === 'ok' ? 'status-ok' : 'status-err';
+      var statusTxt = v.status === 'ok' ? '✅ OK' : '❌ ' + esc(v.errorMessage);
+
+      block.innerHTML =
+        '<h4>' + dirLabelHtml(v.directionLabel) + esc(v.from) + ' → ' + esc(v.to) + '</h4>' +
+        '<div class="variant-links">' +
+          '<a href="' + v.osmUrl + '" target="_blank" rel="noopener">OSM #' + v.osmId + '</a>' +
+          '<a href="#" class="show-on-map">Ver en mapa</a>' +
+        '</div>' +
+        '<div class="route-meta">' + esc(v.name) + '</div>' +
+        (v.description ? '<div class="route-meta">Variante: ' + esc(v.description) + '</div>' : '') +
+        '<div class="route-meta ' + statusCls + '">' + statusTxt + ' · ' + v.stopCount + ' paradas</div>' +
+        (v.stops.length ? '<ol class="stops-list">' + v.stops.map(function(s){ return '<li>' + esc(s.name) + '</li>'; }).join('') + '</ol>' : '');
+
+      var valDiv = document.createElement('div');
+      valDiv.className = 'validation';
+      valDiv.innerHTML =
+        '<label>Estado de validación</label>' +
+        '<div class="validation-row">' +
+          '<button type="button" data-status="ok">✓ Correcta</button>' +
+          '<button type="button" data-status="fix">⚠ Corregir</button>' +
+          '<button type="button" data-status="reject">✗ No es nuestra</button>' +
+        '</div>' +
+        '<label>Observaciones</label>' +
+        '<textarea placeholder="Detalle de correcciones…"></textarea>';
+
+      var saved = validation[v.osmId] || {};
+      valDiv.querySelectorAll('[data-status]').forEach(function (btn) {
+        if (saved.status === btn.dataset.status) btn.classList.add('active');
+        btn.addEventListener('click', function () {
+          valDiv.querySelectorAll('[data-status]').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          validation[v.osmId] = validation[v.osmId] || {};
+          validation[v.osmId].status = btn.dataset.status;
+          validation[v.osmId].updatedAt = new Date().toISOString();
+          saveValidation(validation);
+        });
+      });
+      var notes = valDiv.querySelector('textarea');
+      notes.value = saved.notes || '';
+      notes.addEventListener('input', function () {
+        validation[v.osmId] = validation[v.osmId] || {};
+        validation[v.osmId].notes = notes.value;
+        validation[v.osmId].updatedAt = new Date().toISOString();
+        saveValidation(validation);
+      });
+
+      block.appendChild(valDiv);
+      block.querySelector('.show-on-map').addEventListener('click', function (e) {
+        e.preventDefault();
+        setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+        document.getElementById('overview-map').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      variantsCol.appendChild(block);
+    });
+
+    grid.appendChild(variantsCol);
+    body.appendChild(grid);
+    card.appendChild(body);
+    container.appendChild(card);
+
+    header.addEventListener('click', function () {
+      card.classList.toggle('open');
+      if (card.classList.contains('open') && !routeMaps[group.ref]) initRefMap(group, mapDiv);
+    });
+  });
+
+  function initRefMap(group, el) {
+    var map = L.map(el, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(map);
+    var bounds = L.latLngBounds([]);
+    var hues = ['#2563eb','#dc2626','#16a34a','#9333ea','#d97706','#0891b2'];
+    group.variants.forEach(function (v, i) {
+      if (!v.coordinates.length) return;
+      var color = hues[i % hues.length];
+      var latlngs = coordsToLatLngs(v.coordinates);
+      L.polyline(latlngs, { color: color, weight: 5 }).bindPopup(buildPopup(v)).addTo(map);
+      addDirectionArrow(map, latlngs, color);
+      latlngs.forEach(function (ll) { bounds.extend(ll); });
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], { radius: STOP_RADIUS, color: color, fillOpacity: 0.7, weight: 1 })
+          .bindPopup(esc(s.name)).addTo(map);
+      });
+    });
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] });
+    routeMaps[group.ref] = map;
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  }
+
+  function applyFilters() {
+    var q = document.getElementById('search').value.toLowerCase().trim();
+    var refFilter = document.getElementById('filter-ref').value;
+    document.querySelectorAll('.route-card').forEach(function (card) {
+      var ref = card.dataset.ref;
+      var visible = !refFilter || ref === refFilter;
+      if (visible && q) {
+        visible = false;
+        card.querySelectorAll('.variant-block').forEach(function (vb) {
+          var match = vb.dataset.search.indexOf(q) >= 0;
+          vb.style.display = match ? '' : 'none';
+          if (match) visible = true;
+        });
+      } else {
+        card.querySelectorAll('.variant-block').forEach(function (vb) { vb.style.display = ''; });
+      }
+      card.classList.toggle('hidden', !visible);
+    });
+    document.querySelectorAll('.vis-ref-group').forEach(function (rg) {
+      var ref = rg.dataset.ref;
+      var show = !refFilter || ref === refFilter;
+      if (show && q) {
+        var any = false;
+        rg.querySelectorAll('.vis-variant').forEach(function (row) {
+          var match = row.dataset.search.indexOf(q) >= 0;
+          row.style.display = match ? '' : 'none';
+          if (match) any = true;
+        });
+        rg.style.display = any ? '' : 'none';
+      } else {
+        rg.style.display = show ? '' : 'none';
+        rg.querySelectorAll('.vis-variant').forEach(function (row) { row.style.display = ''; });
+      }
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('filter-ref').addEventListener('change', applyFilters);
+
+  function updateProgress() {
+    var total = 0, done = 0;
+    REPORT.refGroups.forEach(function (g) {
+      g.variants.forEach(function (v) {
+        total++;
+        if (validation[v.osmId] && validation[v.osmId].status) done++;
+      });
+    });
+    document.getElementById('progress').textContent = done + ' / ' + total + ' validadas';
+  }
+
+  document.getElementById('export-json').addEventListener('click', function () {
+    var payload = {
+      slug: REPORT.slug, operator: REPORT.operator, cityName: REPORT.cityName,
+      exportedAt: new Date().toISOString(), validations: validation,
+      routes: REPORT.refGroups.flatMap(function (g) {
+        return g.variants.map(function (v) {
+          return { osmId: v.osmId, ref: v.ref, from: v.from, to: v.to, direction: v.directionLabel, validation: validation[v.osmId] || null };
+        });
+      })
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'validacion-' + REPORT.slug + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  refreshAllStyles();
+  updateProgress();
+
+  function invalidateMap() {
+    setTimeout(function () { overviewMap.invalidateSize(); }, 50);
+  }
+
+  function toggleSidebar() {
+    var sb = document.getElementById('map-sidebar');
+    sb.classList.toggle('collapsed');
+    invalidateMap();
+  }
+
+  document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
+  document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
+  window.addEventListener('resize', invalidateMap);
+  invalidateMap();
+})();
+  </script>
+</body>
+</html>

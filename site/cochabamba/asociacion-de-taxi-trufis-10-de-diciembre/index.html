@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Asociación de taxi trufis 10 de diciembre — Validación de rutas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --bg: #f4f6f8; --card: #fff; --text: #1a1a2e; --muted: #5c6370;
+      --accent: #2563eb; --accent-hover: #1d4ed8; --highlight: #f59e0b;
+      --ok: #16a34a; --warn: #d97706; --err: #dc2626; --border: #e2e8f0;
+      --dim: #cbd5e1; --ida: #2563eb; --vuelta: #9333ea;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      display: flex; flex-direction: column;
+    }
+    .top-chrome {
+      flex-shrink: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      z-index: 600;
+    }
+    .top-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: #fff;
+    }
+    .top-row h1 { margin: 0; font-size: 1.05rem; font-weight: 600; flex: 1; min-width: 10rem; }
+    .top-meta { font-size: 0.78rem; opacity: 0.9; white-space: nowrap; }
+    .stats { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .stat { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.75rem; white-space: nowrap; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      align-items: center;
+      background: var(--card);
+    }
+    .toolbar input, .toolbar select, .toolbar button {
+      font: inherit; padding: 0.35rem 0.55rem; border: 1px solid var(--border);
+      border-radius: 6px; background: #fff; font-size: 0.85rem;
+    }
+    .toolbar input[type=search] { flex: 1; min-width: 8rem; max-width: 16rem; }
+    .toolbar button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+    .toolbar button:hover { background: var(--accent-hover); }
+    .toolbar button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
+    .toolbar button.icon-btn { padding: 0.35rem 0.6rem; min-width: 2rem; }
+    .progress-bar { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .map-workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      height: calc(100vh - 6.5rem);
+      max-height: calc(100vh - 6.5rem);
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .sidebar-toggle {
+      display: none;
+      position: absolute; top: 0.5rem; left: 0.5rem; z-index: 450;
+      font: inherit; font-size: 0.8rem; padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: rgba(255,255,255,0.95); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    .map-sidebar {
+      width: 300px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      height: 100%; min-height: 0;
+      background: #fafbfc;
+      transition: transform 0.2s ease, width 0.2s ease;
+      z-index: 440;
+    }
+    .map-sidebar.collapsed { width: 0; overflow: hidden; border-right: none; }
+    .map-sidebar-head { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0; }
+    .map-sidebar-head h2 { margin: 0 0 0.3rem; font-size: 0.88rem; }
+    .map-sidebar-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .map-sidebar-actions button {
+      font: inherit; font-size: 0.72rem; padding: 0.22rem 0.45rem;
+      border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer;
+    }
+    .map-sidebar-actions button:hover { background: #e2e8f0; }
+    .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
+    .vis-ref-group { border-bottom: 1px solid var(--border); }
+    .vis-ref-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; background: #fafbfc; cursor: pointer; }
+    .vis-ref-head input { margin: 0; }
+    .vis-variant { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem 0.75rem 0.3rem 1.15rem; font-size: 0.76rem; cursor: pointer; border-left: 3px solid transparent; }
+    .vis-variant:hover { background: #f8fafc; }
+    .vis-variant.selected { background: #fffbeb; border-left-color: var(--highlight); }
+    .vis-variant input { margin-top: 0.12rem; flex-shrink: 0; }
+    .vis-variant-text { flex: 1; min-width: 0; }
+    .vis-variant-text strong { display: block; font-weight: 500; font-size: 0.78rem; }
+    .dir-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 0.08rem 0.3rem; border-radius: 4px; margin-right: 0.2rem; }
+    .dir-ida { background: #dbeafe; color: var(--ida); }
+    .dir-vuelta { background: #ede9fe; color: var(--vuelta); }
+    .dir-unico { background: #f1f5f9; color: var(--muted); }
+    .map-main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0; }
+    .map-main-head {
+      padding: 0.35rem 0.75rem; font-size: 0.78rem; color: var(--muted);
+      border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0;
+    }
+    .map-wrap { position: relative; flex: 1; min-height: 0; }
+    #overview-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-empty-hint {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(255,255,255,0.94); padding: 0.65rem 1rem; border-radius: 8px;
+      font-size: 0.85rem; color: var(--muted); pointer-events: none; z-index: 400;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+    .dir-arrow-icon { background: none !important; border: none !important; font-size: 14px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 4px #fff; }
+    .validation-panel {
+      flex-shrink: 0;
+      max-width: 1200px; width: 100%; margin: 0 auto;
+      padding: 1.25rem 1rem 2rem;
+    }
+    .validation-panel > h2 { margin: 0 0 1rem; font-size: 1.1rem; color: var(--text); }
+    .route-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+    .route-card.hidden { display: none; }
+    .route-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.75rem 1rem; cursor: pointer; user-select: none; }
+    .route-header:hover { background: #f8fafc; }
+    .route-badge { font-weight: 700; font-size: 1.1rem; color: var(--accent); min-width: 3rem; }
+    .route-title { flex: 1; font-size: 0.95rem; }
+    .route-meta { font-size: 0.8rem; color: var(--muted); }
+    .route-body { display: none; border-top: 1px solid var(--border); }
+    .route-card.open .route-body { display: block; }
+    .route-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; }
+    @media (max-width: 768px) { .route-grid { grid-template-columns: 1fr; } }
+    .route-map { height: 260px; border-radius: 8px; border: 1px solid var(--border); }
+    .variant-block { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .variant-block:last-child { margin-bottom: 0; }
+    .variant-block h4 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+    .variant-links a { color: var(--accent); font-size: 0.85rem; margin-right: 1rem; }
+    .validation { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); }
+    .validation label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .validation-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+    .validation-row button { font: inherit; font-size: 0.8rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; cursor: pointer; }
+    .validation-row button.active[data-status="ok"] { background: #dcfce7; border-color: var(--ok); color: var(--ok); }
+    .validation-row button.active[data-status="fix"] { background: #fef3c7; border-color: var(--warn); color: var(--warn); }
+    .validation-row button.active[data-status="reject"] { background: #fee2e2; border-color: var(--err); color: var(--err); }
+    .validation textarea { width: 100%; min-height: 2.5rem; font: inherit; font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+    .stops-list { max-height: 180px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem; }
+    footer.app-footer { flex-shrink: 0; text-align: center; padding: 0.75rem; font-size: 0.75rem; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
+    .status-ok { color: var(--ok); }
+    .status-err { color: var(--err); }
+    @media (max-width: 900px) {
+      .map-workspace { height: calc(100vh - 7rem); max-height: calc(100vh - 7rem); }
+      .sidebar-toggle { display: block; }
+      .map-sidebar {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        box-shadow: 4px 0 16px rgba(0,0,0,0.15);
+      }
+      .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-chrome">
+    <div class="top-row">
+      <h1>Asociación de taxi trufis 10 de diciembre</h1>
+      <span class="top-meta">cochabamba · 2026-05-30</span>
+      <div class="stats">
+        <span class="stat">4 relaciones</span>
+        <span class="stat">1 líneas</span>
+        <span class="stat">0 errores</span>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar ref, origen, destino…" aria-label="Buscar rutas">
+      <select id="filter-ref" aria-label="Filtrar por línea">
+        <option value="">Todas las líneas</option>
+        <option value="133">133 (4)</option>
+      </select>
+      <button type="button" class="secondary icon-btn" id="toggle-sidebar" title="Mostrar/ocultar panel de rutas">☰</button>
+      <button type="button" class="secondary" id="export-json">Exportar</button>
+      <span class="progress-bar" id="progress">0 / 0 validadas</span>
+    </div>
+  </div>
+
+  <div class="map-workspace">
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle-mobile">☰ Rutas</button>
+    <aside class="map-sidebar" id="map-sidebar">
+      <div class="map-sidebar-head">
+        <h2>Rutas en mapa</h2>
+        <div class="map-sidebar-actions">
+          <button type="button" id="vis-all">Todas</button>
+          <button type="button" id="vis-none">Ninguna</button>
+          <button type="button" id="fit-visible">Ajustar</button>
+        </div>
+      </div>
+      <div class="route-visibility-list" id="visibility-list"></div>
+    </aside>
+    <div class="map-main">
+      <div class="map-main-head" id="map-status">Seleccione rutas · clic en línea para resaltar</div>
+      <div class="map-wrap">
+        <div id="overview-map"></div>
+        <div class="map-empty-hint" id="map-hint">Marque rutas en el panel ← para verlas en el mapa</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="validation-panel">
+    <h2>Detalle y validación por ruta</h2>
+    <div id="routes-container"></div>
+  </section>
+
+  <footer class="app-footer">
+    Generado por <a href="https://www.trufi-association.org/" target="_blank" rel="noopener">Trufi Association</a> · observaciones guardadas localmente
+  </footer>
+
+  <script id="report-data" type="application/json">{"slug":"asociacion-de-taxi-trufis-10-de-diciembre","operator":"Asociación de taxi trufis 10 de diciembre","cityName":"cochabamba","generatedAt":"2026-05-30T19:13:11.161Z","stats":{"totalVariants":4,"uniqueRefs":1,"errors":0,"totalStops":500},"refGroups":[{"ref":"133","gtfsRouteId":106,"routeColor":"888888","routeLongName":"MiniBus 133","variants":[{"osmId":10721050,"ref":"133","name":"MiniBus 133: Avenida Sexta → Calle José F. Guevara","from":"Avenida Sexta","to":"Calle José F. Guevara","description":"","tripHeadsign":"Calle José F. Guevara","routeType":"bus","gtfsRouteId":106,"routeColor":"888888","stopCount":128,"stops":[{"id":794098688,"name":"Calle Isaac Aranibar","lat":-17.3817742,"lon":-66.2080715},{"id":11071479568,"name":"Calle Cardenal Richard James Cushing","lat":-17.3818422,"lon":-66.2078009},{"id":3017419848,"name":"Calle Cardenal Richard James Cushing","lat":-17.3827278,"lon":-66.2070718},{"id":560437413,"name":"Calle Cardenal Richard James Cushing y Calle Monseñor Juan Tarsicio Senner","lat":-17.3832597,"lon":-66.2066875},{"id":560437411,"name":"Avenida d'Orbigny y Calle Cardenal Richard James Cushing","lat":-17.3844499,"lon":-66.2059582},{"id":8995432794,"name":"Avenida d'Orbigny","lat":-17.3845613,"lon":-66.2047488},{"id":2357131268,"name":"Avenida d'Orbigny y Calle Doctor Pedro Nolasco Crespo","lat":-17.3845909,"lon":-66.2036135},{"id":3259119670,"name":"Avenida d'Orbigny","lat":-17.3847764,"lon":-66.2023771},{"id":10875062226,"name":"Avenida d'Orbigny","lat":-17.3855202,"lon":-66.2004342},{"id":9355419499,"name":"Rotonda d'Orbigny y Juan Pablo II y Avenida d'Orbigny","lat":-17.3859145,"lon":-66.1992541},{"id":9355419495,"name":"Rotonda d'Orbigny y Juan Pablo II","lat":-17.3859667,"lon":-66.1991766},{"id":8670188796,"name":"Avenida d'Orbigny","lat":-17.3859832,"lon":-66.1990844},{"id":7070781700,"name":"Avenida d'Orbigny","lat":-17.3865033,"lon":-66.1980579},{"id":2357133921,"name":"Avenida d'Orbigny","lat":-17.3870065,"lon":-66.196898},{"id":6376331863,"name":"Avenida d'Orbigny","lat":-17.3870862,"lon":-66.1963086},{"id":9701699245,"name":"Avenida d'Orbigny","lat":-17.3868698,"lon":-66.1954212},{"id":560522434,"name":"Avenida d'Orbigny y Calle Antonio Auza","lat":-17.3868999,"lon":-66.193812},{"id":7957525169,"name":"Avenida d'Orbigny","lat":-17.3866303,"lon":-66.1923963},{"id":3265528130,"name":"Avenida d'Orbigny","lat":-17.386075,"lon":-66.1903103},{"id":7956617291,"name":"Avenida d'Orbigny","lat":-17.3859183,"lon":-66.1891055},{"id":7956609165,"name":"Avenida d'Orbigny","lat":-17.3859301,"lon":-66.1883411},{"id":2265578424,"name":"Avenida d'Orbigny","lat":-17.3861026,"lon":-66.1880632},{"id":5869436078,"name":"Avenida d'Orbigny","lat":-17.3861635,"lon":-66.1874997},{"id":2265578451,"name":"Avenida d'Orbigny","lat":-17.3860842,"lon":-66.1868642},{"id":3040552982,"name":"Avenida d'Orbigny y Avenida José Manuel Villavicencio","lat":-17.3861372,"lon":-66.1857383},{"id":9000087197,"name":"Avenida d'Orbigny","lat":-17.3862125,"lon":-66.1851326},{"id":560522637,"name":"Avenida d'Orbigny","lat":-17.3872187,"lon":-66.182779},{"id":7961801405,"name":"Avenida d'Orbigny y Avenida Beijing y Rotonda Beijing y d'Orbigny","lat":-17.387429,"lon":-66.1824069},{"id":2140930460,"name":"Avenida Beijing","lat":-17.3886871,"lon":-66.1828203},{"id":560522573,"name":"Avenida Beijing","lat":-17.3912359,"lon":-66.1836455},{"id":4576706142,"name":"Avenida Beijing y Calle Moisés Monroy","lat":-17.3913696,"lon":-66.1837242},{"id":4398318263,"name":"Rotonda Distribuidor Beijing y Distribudor Beijing","lat":-17.3931756,"lon":-66.1844911},{"id":4398318266,"name":"Distribudor Beijing y Rotonda Distribuidor Beijing","lat":-17.393444,"lon":-66.1845056},{"id":4398318255,"name":"Rotonda Distribuidor Beijing","lat":-17.3935698,"lon":-66.1842594},{"id":560522669,"name":"Avenida Carlos Blanco Galindo","lat":-17.3935298,"lon":-66.1810597},{"id":689437127,"name":"Avenida Carlos Blanco Galindo","lat":-17.3935677,"lon":-66.1801494},{"id":800044225,"name":"Avenida Carlos Blanco Galindo y Calle Gregorio Gamarra","lat":-17.3935933,"lon":-66.1795661},{"id":800044066,"name":"Avenida Carlos Blanco Galindo y Avenida Daniel Campos","lat":-17.3936785,"lon":-66.1776738},{"id":800044095,"name":"Avenida Carlos Blanco Galindo","lat":-17.393733,"lon":-66.1764849},{"id":800044053,"name":"Avenida Carlos Blanco Galindo y Avenida Confederación","lat":-17.3938393,"lon":-66.1740147},{"id":13416534064,"name":"Avenida Carlos Blanco Galindo","lat":-17.3939959,"lon":-66.171351},{"id":13416534061,"name":"Avenida Carlos Blanco Galindo y Rotonda Carlos Blanco Galindo y Perú","lat":-17.3940604,"lon":-66.1707777},{"id":13416534071,"name":"Rotonda Carlos Blanco Galindo y Perú y Avenida General Campero","lat":-17.3940986,"lon":-66.1706843},{"id":13303071581,"name":"Rotonda Carlos Blanco Galindo y Perú y Avenida Carlos Blanco Galindo","lat":-17.3940823,"lon":-66.1705706},{"id":13416534073,"name":"Avenida Carlos Blanco Galindo","lat":-17.3941299,"lon":-66.1703542},{"id":800044036,"name":"Avenida Carlos Blanco Galindo","lat":-17.3941568,"lon":-66.1683519},{"id":4732874466,"name":"Avenida Carlos Blanco Galindo","lat":-17.3941365,"lon":-66.1676034},{"id":315942232,"name":"Avenida Carlos Blanco Galindo y Puente 14 de Enero","lat":-17.394114,"lon":-66.1673762},{"id":8147129096,"name":"Avenida Heroínas de la Coronilla","lat":-17.3940263,"lon":-66.1666089},{"id":1636978219,"name":"Avenida Heroínas de la Coronilla","lat":-17.3938936,"lon":-66.166192},{"id":10792253186,"name":"Avenida Heroínas de la Coronilla","lat":-17.3935005,"lon":-66.1639803},{"id":698492322,"name":"Avenida Heroínas de la Coronilla y Calle Tumusla","lat":-17.3931798,"lon":-66.1620531},{"id":2694171670,"name":"Avenida Heroínas de la Coronilla","lat":-17.3930004,"lon":-66.1609788},{"id":2694171664,"name":"Avenida Heroínas de la Coronilla","lat":-17.3928215,"lon":-66.1598656},{"id":2295541620,"name":"Avenida Heroínas de la Coronilla","lat":-17.3926578,"lon":-66.1589237},{"id":3635441114,"name":"Avenida Ayacucho","lat":-17.3935139,"lon":-66.1586938},{"id":648546079,"name":"Avenida Ayacucho","lat":-17.3946244,"lon":-66.1584685},{"id":2331302377,"name":"Avenida Ayacucho","lat":-17.3957154,"lon":-66.1582695},{"id":648546085,"name":"Avenida Ayacucho y Calle Batalla de Calama","lat":-17.3967147,"lon":-66.1581304},{"id":648546087,"name":"Avenida Ayacucho y Calle Uruguay","lat":-17.3989265,"lon":-66.1577782},{"id":310262704,"name":"Avenida Ayacucho y Calle Uruguay","lat":-17.3989051,"lon":-66.1576879},{"id":310501000,"name":"Calle Uruguay y Calle Nataniel Aguirre","lat":-17.3986551,"lon":-66.1565799},{"id":1727306401,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3994887,"lon":-66.1564374},{"id":310502881,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3995781,"lon":-66.1564225},{"id":310502882,"name":"Calle Nataniel Aguirre y Calle Ismael Montes","lat":-17.4007931,"lon":-66.1561989},{"id":2577975158,"name":"Calle Nataniel Aguirre y Calle Punata","lat":-17.4022946,"lon":-66.1559112},{"id":702511964,"name":"Calle Esteban Arze y Calle Honduras","lat":-17.4013426,"lon":-66.1552573},{"id":310503058,"name":"Calle Ismael Montes y Calle Esteban Arze","lat":-17.4006491,"lon":-66.1552182},{"id":8238772507,"name":"Calle Esteban Arze","lat":-17.3999701,"lon":-66.1551794},{"id":648548822,"name":"Avenida Aroma y Calle Esteban Arze","lat":-17.3993376,"lon":-66.1552833},{"id":1727306404,"name":"Avenida Aroma y Calle Esteban Arze","lat":-17.3992471,"lon":-66.1553036},{"id":310501001,"name":"Calle Uruguay y Calle Esteban Arze","lat":-17.39841,"lon":-66.1554698},{"id":310500794,"name":"Calle Ladislao Cabrera y Calle Esteban Arze","lat":-17.3973663,"lon":-66.1556929},{"id":8241410036,"name":"Calle Esteban Arze","lat":-17.3966238,"lon":-66.1558309},{"id":310500546,"name":"Calle 25 de Mayo y Calle Batalla de Calama","lat":-17.3961338,"lon":-66.1547941},{"id":308300467,"name":"Avenida General José de San Martín y Calle Batalla de Calama","lat":-17.3959471,"lon":-66.1537317},{"id":308300466,"name":"Avenida General José de San Martín","lat":-17.3948923,"lon":-66.1539225},{"id":315103283,"name":"Avenida General José de San Martín","lat":-17.3944121,"lon":-66.154011},{"id":303217863,"name":"Avenida General José de San Martín y Calle José Antonio de Sucre","lat":-17.3938613,"lon":-66.1541124},{"id":308300565,"name":"Avenida General José de San Martín y Calle Simon Bolívar","lat":-17.3928243,"lon":-66.1543214},{"id":698492397,"name":"Avenida General José de San Martín y Avenida Heroínas de la Coronilla","lat":-17.3918758,"lon":-66.1545005},{"id":303218728,"name":"Avenida Heroínas de la Coronilla y Avenida General José de San Martín","lat":-17.3917873,"lon":-66.1545177},{"id":10008644757,"name":"Avenida General José de San Martín","lat":-17.3907655,"lon":-66.1547116},{"id":308306726,"name":"Calle Guerrilleros José Miguel Lanza y Calle República de Colombia","lat":-17.3904922,"lon":-66.1536219},{"id":308306727,"name":"Calle Mariano Antezana y Calle República de Colombia","lat":-17.3902546,"lon":-66.1525071},{"id":308306728,"name":"Calle 16 de Julio y Calle República de Colombia","lat":-17.390025,"lon":-66.1514143},{"id":9400884786,"name":"Avenida Aniceto Arce","lat":-17.3896792,"lon":-66.1500285},{"id":6179473251,"name":"Avenida Aniceto Arce","lat":-17.3874105,"lon":-66.1484621},{"id":6179473097,"name":"Avenida Aniceto Arce","lat":-17.3860425,"lon":-66.1475078},{"id":9930862750,"name":"Avenida Aniceto Arce","lat":-17.3841188,"lon":-66.1461942},{"id":1637456494,"name":"Avenida Aniceto Arce","lat":-17.3807254,"lon":-66.1438563},{"id":2391341654,"name":"Avenida Aniceto Arce","lat":-17.3792329,"lon":-66.1428114},{"id":9353076786,"name":"Avenida Aniceto Arce y Rotonda Ramón Rivero y General Galindo León","lat":-17.3790847,"lon":-66.1423139},{"id":6331635784,"name":"Rotonda Ramón Rivero y General Galindo León","lat":-17.3791273,"lon":-66.1421811},{"id":9353076789,"name":"Rotonda Ramón Rivero y General Galindo León","lat":-17.3790326,"lon":-66.142099},{"id":8172711431,"name":"Innominada","lat":-17.3788783,"lon":-66.1421161},{"id":1795293379,"name":"Avenida General Galindo León y Rotonda Cámara de Comercio","lat":-17.3776949,"lon":-66.1422199},{"id":1795293348,"name":"Rotonda Cámara de Comercio","lat":-17.3774952,"lon":-66.1421934},{"id":2389107311,"name":"Avenida General Galindo León","lat":-17.3773105,"lon":-66.1423592},{"id":2389107301,"name":"Avenida General Galindo León","lat":-17.3767615,"lon":-66.142481},{"id":698492587,"name":"Avenida General Galindo León y Calle Mariano Melgarejo","lat":-17.3749628,"lon":-66.1427052},{"id":10830782194,"name":"Plaza Tarija","lat":-17.3739395,"lon":-66.1426346},{"id":1785473274,"name":"Avenida América y Calle Rosendo Villalobos","lat":-17.3738708,"lon":-66.1416102},{"id":9276752239,"name":"Avenida América","lat":-17.3740376,"lon":-66.1388488},{"id":8509264252,"name":"Avenida América","lat":-17.3740798,"lon":-66.1381326},{"id":1796486602,"name":"Avenida América","lat":-17.3741736,"lon":-66.1372099},{"id":11987099446,"name":"Rotonda Benito Juárez","lat":-17.3742654,"lon":-66.1370104},{"id":11987099441,"name":"Rotonda Benito Juárez","lat":-17.3742931,"lon":-66.1368541},{"id":11079121781,"name":"Rotonda Benito Juárez","lat":-17.3740803,"lon":-66.1367514},{"id":5605166011,"name":"Avenida Uyuni","lat":-17.3729032,"lon":-66.1367915},{"id":11987099418,"name":"Avenida Circunvalación","lat":-17.3728479,"lon":-66.1360835},{"id":6835289597,"name":"Avenida Circunvalación","lat":-17.3727806,"lon":-66.1351908},{"id":13368859879,"name":"Avenida Circunvalación","lat":-17.3725714,"lon":-66.1341027},{"id":602990152,"name":"Avenida Circunvalación","lat":-17.3724275,"lon":-66.1330653},{"id":602990159,"name":"Avenida Circunvalación","lat":-17.3731471,"lon":-66.1309399},{"id":602990163,"name":"Avenida Circunvalación","lat":-17.3732694,"lon":-66.1298549},{"id":1008238282,"name":"Avenida Circunvalación y Calle 6 de Junio","lat":-17.3735261,"lon":-66.1289941},{"id":11071563642,"name":"Avenida 6 de Junio y Avenida Circunvalación","lat":-17.3735513,"lon":-66.1288841},{"id":1044378998,"name":"Avenida Circunvalación","lat":-17.3735386,"lon":-66.1271409},{"id":1008238325,"name":"Calle María Quiroga Vargas","lat":-17.372613,"lon":-66.1262537},{"id":1008238324,"name":"Avenida General Bernardino Bilbao Rioja y Calle Rene Fernández B.","lat":-17.3703392,"lon":-66.1277529},{"id":8436191177,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.370304,"lon":-66.1263394},{"id":8436201476,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3702143,"lon":-66.1238569},{"id":1008238517,"name":"Calle José Curtinas y Avenida General Bernardino Bilbao Rioja","lat":-17.3702076,"lon":-66.123606},{"id":1046716560,"name":"Calle Papa León XIII y Calle José Curtinas","lat":-17.3696178,"lon":-66.123681},{"id":1046717394,"name":"Calle Papa León XIII","lat":-17.3692801,"lon":-66.1232154},{"id":2319257658,"name":"Calle Juan Manuel Zafra","lat":-17.3683319,"lon":-66.1226797},{"id":7435641389,"name":"Calle Juan Manuel Zafra","lat":-17.3672047,"lon":-66.1223107}],"coordinates":[[-66.2080715,-17.3817742],[-66.2077974,-17.3818128],[-66.2078009,-17.3818422],[-66.2077891,-17.38188],[-66.2070718,-17.3827278],[-66.2068535,-17.383058],[-66.2067507,-17.3831945],[-66.2066875,-17.3832597],[-66.2059582,-17.3844499],[-66.2059547,-17.3845389],[-66.2058563,-17.3845396],[-66.2054737,-17.3845428],[-66.2052495,-17.3845446],[-66.2047488,-17.3845613],[-66.2047079,-17.3845627],[-66.2045725,-17.3845672],[-66.204507,-17.3845683],[-66.2044444,-17.3845693],[-66.2036135,-17.3845909],[-66.2030211,-17.3846166],[-66.2027512,-17.3846751],[-66.2025001,-17.3847303],[-66.2023771,-17.3847764],[-66.2018807,-17.3850082],[-66.2018085,-17.3850419],[-66.2017516,-17.3850645],[-66.2015185,-17.3851572],[-66.2004342,-17.3855202],[-66.2002485,-17.3855814],[-66.1999671,-17.3856701],[-66.1993868,-17.3858562],[-66.1993148,-17.3858833],[-66.1992541,-17.3859145],[-66.1992423,-17.3859326],[-66.1992315,-17.3859435],[-66.199219,-17.3859527],[-66.1991986,-17.3859621],[-66.1991766,-17.3859667],[-66.199154,-17.3859663],[-66.1991321,-17.3859609],[-66.1991178,-17.3859555],[-66.1990844,-17.3859832],[-66.1990542,-17.3860039],[-66.1990088,-17.386028],[-66.1989651,-17.3860509],[-66.1988798,-17.386093],[-66.1980579,-17.3865033],[-66.1979284,-17.3865705],[-66.1976982,-17.3866731],[-66.1973102,-17.386849],[-66.1970625,-17.3869559],[-66.196898,-17.3870065],[-66.1966102,-17.3870875],[-66.196543,-17.3871023],[-66.1964558,-17.3871091],[-66.1963971,-17.3871078],[-66.1963086,-17.3870862],[-66.195837,-17.3869571],[-66.1956529,-17.3869067],[-66.195564,-17.3868823],[-66.1954212,-17.3868698],[-66.1954046,-17.3868684],[-66.1950256,-17.3868764],[-66.1949018,-17.3868763],[-66.1939251,-17.3868975],[-66.193812,-17.3868999],[-66.1935602,-17.3869023],[-66.1933891,-17.3868798],[-66.1931897,-17.3868398],[-66.1928895,-17.3867542],[-66.1923963,-17.3866303],[-66.1923407,-17.3866163],[-66.19158,-17.3864254],[-66.1915174,-17.3864097],[-66.1906464,-17.3861682],[-66.1903103,-17.386075],[-66.1899984,-17.3859936],[-66.1898932,-17.3859713],[-66.1892689,-17.3859293],[-66.1891055,-17.3859183],[-66.1890594,-17.3859154],[-66.1887202,-17.3858983],[-66.1885797,-17.385893],[-66.1884209,-17.385911],[-66.1883411,-17.3859301],[-66.1882792,-17.3859555],[-66.1882081,-17.3859973],[-66.1881529,-17.3860426],[-66.1881282,-17.3860563],[-66.1880632,-17.3861026],[-66.1879632,-17.3861578],[-66.1878663,-17.3861858],[-66.1877602,-17.3861909],[-66.1876679,-17.3861846],[-66.1874997,-17.3861635],[-66.1873422,-17.3861446],[-66.1872982,-17.3861377],[-66.1872707,-17.3861342],[-66.1868642,-17.3860842],[-66.1867245,-17.3860759],[-66.1865707,-17.386078],[-66.1864336,-17.3860851],[-66.1858967,-17.3861217],[-66.1857383,-17.3861372],[-66.1854834,-17.38616],[-66.1854315,-17.3861654],[-66.1853107,-17.3861765],[-66.1852125,-17.3861944],[-66.1851326,-17.3862125],[-66.1850581,-17.3862366],[-66.1849534,-17.3862776],[-66.1841618,-17.3866246],[-66.1835924,-17.3868738],[-66.182779,-17.3872187],[-66.1825887,-17.3873008],[-66.1824841,-17.3873492],[-66.1824443,-17.3873824],[-66.1824069,-17.387429],[-66.1824202,-17.3875173],[-66.1824279,-17.3875492],[-66.1825258,-17.3878292],[-66.182806,-17.3886456],[-66.1828203,-17.3886871],[-66.1831317,-17.389616],[-66.1831757,-17.3897559],[-66.1832318,-17.3899344],[-66.1832967,-17.3901412],[-66.1834318,-17.3906087],[-66.1836455,-17.3912359],[-66.1837242,-17.3913696],[-66.1839789,-17.3920868],[-66.1840019,-17.3922009],[-66.1842174,-17.3927838],[-66.1842945,-17.3930119],[-66.1843153,-17.3930735],[-66.1843653,-17.3930853],[-66.184412,-17.3931062],[-66.1844416,-17.3931258],[-66.1844682,-17.3931491],[-66.1844911,-17.3931756],[-66.1845103,-17.3932056],[-66.1845214,-17.3932289],[-66.1845299,-17.3932531],[-66.1845359,-17.393278],[-66.1845391,-17.3933033],[-66.1845396,-17.3933288],[-66.1845374,-17.3933542],[-66.1845324,-17.3933793],[-66.1845248,-17.3934037],[-66.1845056,-17.393444],[-66.1844906,-17.3934664],[-66.1844731,-17.3934872],[-66.184446,-17.3935122],[-66.1844155,-17.3935332],[-66.1843778,-17.3935516],[-66.1843492,-17.393561],[-66.1843197,-17.3935673],[-66.1842896,-17.3935702],[-66.1842594,-17.3935698],[-66.1842277,-17.3935658],[-66.1841921,-17.3935566],[-66.1841583,-17.3935428],[-66.1841244,-17.3935229],[-66.184094,-17.3934983],[-66.1840679,-17.3934696],[-66.1837667,-17.3934848],[-66.1830779,-17.3935189],[-66.1828126,-17.3934473],[-66.1818302,-17.393494],[-66.1810597,-17.3935298],[-66.1801494,-17.3935677],[-66.1795661,-17.3935933],[-66.1776738,-17.3936785],[-66.1772788,-17.3936967],[-66.1766698,-17.3937248],[-66.176607,-17.3937277],[-66.1764849,-17.393733],[-66.1763233,-17.3937399],[-66.1746071,-17.3938138],[-66.1740147,-17.3938393],[-66.1739096,-17.3938439],[-66.1724045,-17.3939064],[-66.172135,-17.3939606],[-66.171351,-17.3939959],[-66.1711564,-17.3940107],[-66.1708685,-17.3940485],[-66.1708359,-17.3940528],[-66.1707777,-17.3940604],[-66.1707491,-17.3940782],[-66.1707177,-17.394089],[-66.1706843,-17.3940986],[-66.1706577,-17.3941006],[-66.1706312,-17.3940991],[-66.170605,-17.3940943],[-66.1705706,-17.3940823],[-66.1705363,-17.3940981],[-66.1705029,-17.3941101],[-66.1703542,-17.3941299],[-66.1692179,-17.3941727],[-66.16885,-17.3941349],[-66.1687489,-17.3941394],[-66.1683519,-17.3941568],[-66.1680676,-17.3941641],[-66.1679544,-17.3941685],[-66.1678047,-17.3941549],[-66.1676034,-17.3941365],[-66.1674792,-17.3941219],[-66.167405,-17.3941166],[-66.1673762,-17.394114],[-66.1669627,-17.3940655],[-66.1669372,-17.3940636],[-66.1666985,-17.3940382],[-66.1666089,-17.3940263],[-66.1665145,-17.3940046],[-66.166338,-17.3939312],[-66.1662729,-17.3939109],[-66.166192,-17.3938936],[-66.165909,-17.3938483],[-66.1649058,-17.3936696],[-66.1639803,-17.3935005],[-66.1639145,-17.3934885],[-66.1638608,-17.3934796],[-66.1621491,-17.3931957],[-66.1620531,-17.3931798],[-66.1619793,-17.3931673],[-66.1611143,-17.3930202],[-66.1610467,-17.3930087],[-66.1609788,-17.3930004],[-66.1599503,-17.3928359],[-66.1599057,-17.3928281],[-66.1598656,-17.3928215],[-66.1598253,-17.3928149],[-66.1590375,-17.3926786],[-66.1590176,-17.392675],[-66.1589237,-17.3926578],[-66.1588624,-17.3926465],[-66.1588503,-17.3927102],[-66.1586938,-17.3935139],[-66.1586779,-17.3935864],[-66.1586694,-17.3936298],[-66.1584851,-17.3945425],[-66.1584685,-17.3946244],[-66.1584596,-17.3946726],[-66.1582846,-17.3956252],[-66.1582776,-17.3956693],[-66.1582695,-17.3957154],[-66.1582518,-17.3958179],[-66.1581359,-17.3966716],[-66.1581304,-17.3967147],[-66.1581237,-17.3967678],[-66.1579692,-17.3977363],[-66.157959,-17.397794],[-66.1579492,-17.3978569],[-66.1577782,-17.3989265],[-66.1576879,-17.3989051],[-66.1565799,-17.3986551],[-66.1564374,-17.3994887],[-66.1564225,-17.3995781],[-66.1561989,-17.4007931],[-66.1561157,-17.4013136],[-66.1559482,-17.4021963],[-66.1559112,-17.4022946],[-66.1554199,-17.4023008],[-66.1553165,-17.4021915],[-66.1552573,-17.4013426],[-66.1552182,-17.4006491],[-66.1551769,-17.4001495],[-66.155175,-17.400035],[-66.1551794,-17.3999701],[-66.1551889,-17.3998955],[-66.1552224,-17.3996984],[-66.1552833,-17.3993376],[-66.1553036,-17.3992471],[-66.1554698,-17.39841],[-66.1555856,-17.3978682],[-66.1556929,-17.3973663],[-66.1557531,-17.3970471],[-66.1557812,-17.3968979],[-66.1558309,-17.3966238],[-66.1558465,-17.3965283],[-66.1558816,-17.3963297],[-66.1547941,-17.3961338],[-66.1537317,-17.3959471],[-66.1539142,-17.3949382],[-66.1539225,-17.3948923],[-66.1539306,-17.3948483],[-66.154001,-17.3944662],[-66.154011,-17.3944121],[-66.1541051,-17.3938959],[-66.1541124,-17.3938613],[-66.1541225,-17.3938175],[-66.1543131,-17.3928655],[-66.1543214,-17.3928243],[-66.1543276,-17.3927913],[-66.1544925,-17.3919251],[-66.1545005,-17.3918758],[-66.1545177,-17.3917873],[-66.1545292,-17.3917261],[-66.1547116,-17.3907655],[-66.1547221,-17.3907102],[-66.1544139,-17.3906514],[-66.1536219,-17.3904922],[-66.1525071,-17.3902546],[-66.1514143,-17.390025],[-66.1503293,-17.3897959],[-66.1502903,-17.3897874],[-66.1501946,-17.3897684],[-66.1501433,-17.3897582],[-66.1500862,-17.3897464],[-66.1500285,-17.3896792],[-66.1499919,-17.3896269],[-66.1498587,-17.3894366],[-66.1496274,-17.3891111],[-66.1493179,-17.3886449],[-66.148589,-17.3875935],[-66.1484621,-17.3874105],[-66.1484349,-17.3873714],[-66.1483327,-17.3872239],[-66.1483071,-17.3871874],[-66.1479354,-17.3866575],[-66.1477288,-17.386363],[-66.1475078,-17.3860425],[-66.147457,-17.3859653],[-66.1474046,-17.3858887],[-66.1462893,-17.3842572],[-66.1462628,-17.3842184],[-66.1462208,-17.3841579],[-66.1461942,-17.3841188],[-66.145645,-17.3833109],[-66.1450688,-17.3824723],[-66.1449959,-17.3823672],[-66.1442653,-17.3813172],[-66.1442009,-17.3812213],[-66.1438563,-17.3807254],[-66.1431437,-17.3796697],[-66.1429952,-17.3794509],[-66.142953,-17.3793846],[-66.1428861,-17.3792986],[-66.1428531,-17.3792608],[-66.1428114,-17.3792329],[-66.1427468,-17.3792082],[-66.1424977,-17.3791209],[-66.142442,-17.3791053],[-66.1423972,-17.3790962],[-66.1423486,-17.3790869],[-66.1423139,-17.3790847],[-66.1423073,-17.3790928],[-66.1423,-17.3791003],[-66.1422875,-17.3791105],[-66.1422737,-17.3791189],[-66.1422439,-17.3791297],[-66.1422123,-17.3791326],[-66.1421811,-17.3791273],[-66.1421524,-17.3791143],[-66.1421285,-17.3790956],[-66.1421178,-17.3790813],[-66.1421094,-17.3790667],[-66.1421048,-17.379056],[-66.142099,-17.3790326],[-66.1420987,-17.3790092],[-66.1421036,-17.3789863],[-66.1421134,-17.3789648],[-66.1421278,-17.3789459],[-66.142145,-17.3789294],[-66.1421161,-17.3788783],[-66.1421656,-17.3784026],[-66.1421874,-17.3781264],[-66.1422257,-17.3779795],[-66.1422343,-17.3778571],[-66.1422303,-17.3777737],[-66.1422199,-17.3776949],[-66.1421909,-17.3776639],[-66.1421731,-17.3776255],[-66.1421671,-17.377586],[-66.1421707,-17.3775543],[-66.1421773,-17.3775296],[-66.1421934,-17.3774952],[-66.142222,-17.3774681],[-66.1422554,-17.3774507],[-66.1422947,-17.3774383],[-66.1423194,-17.3774203],[-66.1423346,-17.3774054],[-66.1423592,-17.3773105],[-66.14246,-17.3769444],[-66.1424636,-17.3769289],[-66.142464,-17.3769249],[-66.1424703,-17.3768683],[-66.1424748,-17.3768274],[-66.142481,-17.3767615],[-66.1425182,-17.376325],[-66.1425282,-17.3762196],[-66.1425928,-17.3757608],[-66.1426542,-17.3753253],[-66.1426953,-17.375031],[-66.1427052,-17.3749628],[-66.1427183,-17.3748676],[-66.142819,-17.3741845],[-66.1428047,-17.3741261],[-66.1427764,-17.3740572],[-66.1426805,-17.3739877],[-66.1426346,-17.3739395],[-66.1426047,-17.373879],[-66.1425975,-17.3738446],[-66.1424952,-17.3738329],[-66.1424073,-17.3738288],[-66.1423138,-17.3738299],[-66.1416102,-17.3738708],[-66.1413547,-17.3738847],[-66.1406024,-17.3739258],[-66.1405803,-17.3739272],[-66.1397774,-17.3739795],[-66.1396797,-17.3739858],[-66.1388488,-17.3740376],[-66.1388077,-17.3740401],[-66.1385992,-17.3740531],[-66.1385662,-17.374055],[-66.1384337,-17.3740626],[-66.1383137,-17.3740694],[-66.1381326,-17.3740798],[-66.1381031,-17.3740815],[-66.1380704,-17.3740833],[-66.1377613,-17.374101],[-66.1374497,-17.3741239],[-66.137285,-17.3741516],[-66.1372099,-17.3741736],[-66.1371383,-17.3741975],[-66.1371065,-17.3742074],[-66.1370353,-17.3742265],[-66.1370292,-17.3742406],[-66.1370216,-17.3742507],[-66.1370104,-17.3742654],[-66.1369859,-17.3742852],[-66.1369614,-17.3742973],[-66.1369348,-17.3743043],[-66.1369073,-17.3743059],[-66.13688,-17.3743021],[-66.1368541,-17.3742931],[-66.1368307,-17.3742791],[-66.1368109,-17.3742608],[-66.1367954,-17.374239],[-66.1367849,-17.3742146],[-66.1367564,-17.3741062],[-66.1367514,-17.3740803],[-66.1367521,-17.374054],[-66.1367585,-17.3740284],[-66.1367891,-17.3735156],[-66.1368302,-17.3731041],[-66.1368334,-17.3730179],[-66.1368191,-17.3729512],[-66.1367915,-17.3729032],[-66.1367573,-17.3728696],[-66.1367036,-17.3728297],[-66.1366337,-17.372782],[-66.1365427,-17.3727975],[-66.1361547,-17.3728417],[-66.1360835,-17.3728479],[-66.1359771,-17.3728572],[-66.1358602,-17.3728656],[-66.1357817,-17.3728684],[-66.1356853,-17.3728603],[-66.1354966,-17.3728322],[-66.1351908,-17.3727806],[-66.1351489,-17.3727703],[-66.1350753,-17.3727563],[-66.1347435,-17.3726933],[-66.134217,-17.3725934],[-66.1341675,-17.372584],[-66.1341027,-17.3725714],[-66.1337319,-17.3724992],[-66.1334855,-17.3724558],[-66.1333839,-17.3724325],[-66.1333491,-17.3724273],[-66.1331936,-17.3724201],[-66.1330653,-17.3724275],[-66.1326272,-17.3725546],[-66.1319916,-17.3727297],[-66.1318806,-17.3727555],[-66.1316408,-17.3728345],[-66.1311463,-17.3730495],[-66.1309399,-17.3731471],[-66.130845,-17.3731819],[-66.1307188,-17.3732067],[-66.1305431,-17.3732203],[-66.1302763,-17.3732331],[-66.1300836,-17.3732479],[-66.1298549,-17.3732694],[-66.1298225,-17.3732756],[-66.1296782,-17.3733032],[-66.1294941,-17.3733506],[-66.1293598,-17.3733943],[-66.1292169,-17.3734493],[-66.1290806,-17.3735027],[-66.1289941,-17.3735261],[-66.1288841,-17.3735513],[-66.1287924,-17.3735624],[-66.1286912,-17.3735699],[-66.1277564,-17.3735584],[-66.1276188,-17.3735546],[-66.1271409,-17.3735386],[-66.1266958,-17.3735226],[-66.1262345,-17.3735091],[-66.1262335,-17.3734096],[-66.1262537,-17.372613],[-66.1262729,-17.3718519],[-66.1263029,-17.371066],[-66.1277233,-17.371135],[-66.1277502,-17.3704123],[-66.1277529,-17.3703392],[-66.1276829,-17.3703363],[-66.1266596,-17.3703142],[-66.1265643,-17.3703112],[-66.1263394,-17.370304],[-66.1259229,-17.3702889],[-66.1257595,-17.3702829],[-66.1252487,-17.370247],[-66.1242186,-17.3702248],[-66.1238569,-17.3702143],[-66.1237094,-17.3702104],[-66.1236821,-17.3702096],[-66.1236524,-17.3702088],[-66.123606,-17.3702076],[-66.1236069,-17.3701651],[-66.1236085,-17.3701294],[-66.1236264,-17.369723],[-66.1236261,-17.3696916],[-66.123681,-17.3696178],[-66.1236165,-17.3695719],[-66.1232847,-17.3693301],[-66.1232558,-17.3693051],[-66.1232154,-17.3692801],[-66.1230447,-17.3691434],[-66.1229373,-17.3690686],[-66.1227781,-17.3689487],[-66.1227158,-17.3688808],[-66.1226797,-17.3683319],[-66.1226566,-17.3682659],[-66.1226239,-17.3681611],[-66.1225069,-17.3677866],[-66.1224821,-17.3677072],[-66.1223107,-17.3672047]],"osmUrl":"https://www.openstreetmap.org/relation/10721050","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"ida","directionId":1},{"osmId":10721087,"ref":"133","name":"MiniBus 133: Avenida Tadeo Haenke → Calle Federico del Carpio","from":"Avenida Tadeo Haenke","to":"Calle Federico del Carpio","description":"","tripHeadsign":"Calle Federico del Carpio","routeType":"bus","gtfsRouteId":106,"routeColor":"888888","stopCount":122,"stops":[{"id":7996545533,"name":"Avenida Tadeo Haenke y Calle Andrés S. Muñoz","lat":-17.381278,"lon":-66.2000246},{"id":560437436,"name":"Avenida d'Orbigny y Calle Andrés S. Muñoz","lat":-17.3854764,"lon":-66.2002259},{"id":2160418472,"name":"Avenida d'Orbigny","lat":-17.3846951,"lon":-66.2023188},{"id":560084593,"name":"Calle Arzobispo Armando Gutiérrez Granier","lat":-17.3869718,"lon":-66.2029565},{"id":540672568,"name":"Calle Pedro José Cayetano de la Llosa y Calle Monseñor Francisco Cano Galvarro","lat":-17.3892546,"lon":-66.202069},{"id":548128169,"name":"Avenida Juan Pablo II y Calle Monseñor Ismael Rivas","lat":-17.3880789,"lon":-66.1993383},{"id":2357127469,"name":"Innominada","lat":-17.3861189,"lon":-66.1990714},{"id":560522417,"name":"Avenida d'Orbigny","lat":-17.3865705,"lon":-66.1979284},{"id":9316680362,"name":"Avenida d'Orbigny","lat":-17.3871023,"lon":-66.196543},{"id":9701699242,"name":"Avenida d'Orbigny","lat":-17.3869067,"lon":-66.1956529},{"id":560522434,"name":"Avenida d'Orbigny y Calle Antonio Auza","lat":-17.3868999,"lon":-66.193812},{"id":560522428,"name":"Calle Iván Bluske y Calle Antonio Auza","lat":-17.3879776,"lon":-66.1939695},{"id":560522402,"name":"Calle Moisés Monroy","lat":-17.3908489,"lon":-66.1931847},{"id":560522456,"name":"Calle Moisés Monroy","lat":-17.3905938,"lon":-66.1902747},{"id":560522463,"name":"Calle Moisés Monroy","lat":-17.3908284,"lon":-66.1881415},{"id":12723648803,"name":"Calle Moisés Monroy","lat":-17.3910927,"lon":-66.185928},{"id":2381925241,"name":"Calle Moisés Monroy","lat":-17.3912795,"lon":-66.1845135},{"id":4398499259,"name":"Innominada","lat":-17.3922009,"lon":-66.1840019},{"id":4398318265,"name":"Distribudor Beijing y Rotonda Distribuidor Beijing","lat":-17.3930735,"lon":-66.1843153},{"id":13847108955,"name":"Rotonda Distribuidor Beijing","lat":-17.3931491,"lon":-66.1844682},{"id":4398318262,"name":"Rotonda Distribuidor Beijing","lat":-17.3932531,"lon":-66.1845299},{"id":4398318320,"name":"Rotonda Distribuidor Beijing","lat":-17.3933542,"lon":-66.1845374},{"id":4398318266,"name":"Distribudor Beijing y Rotonda Distribuidor Beijing","lat":-17.393444,"lon":-66.1845056},{"id":4398318331,"name":"Rotonda Distribuidor Beijing y Distribudor Beijing","lat":-17.3935332,"lon":-66.1844155},{"id":13847108963,"name":"Rotonda Distribuidor Beijing","lat":-17.3935702,"lon":-66.1842896},{"id":6326495609,"name":"Rotonda Distribuidor Beijing","lat":-17.3935428,"lon":-66.1841583},{"id":4398318259,"name":"Rotonda Distribuidor Beijing y Distribudor Beijing","lat":-17.3934696,"lon":-66.1840679},{"id":560522669,"name":"Avenida Carlos Blanco Galindo","lat":-17.3935298,"lon":-66.1810597},{"id":689437127,"name":"Avenida Carlos Blanco Galindo","lat":-17.3935677,"lon":-66.1801494},{"id":800044225,"name":"Avenida Carlos Blanco Galindo y Calle Gregorio Gamarra","lat":-17.3935933,"lon":-66.1795661},{"id":800044066,"name":"Avenida Carlos Blanco Galindo y Avenida Daniel Campos","lat":-17.3936785,"lon":-66.1776738},{"id":800044095,"name":"Avenida Carlos Blanco Galindo","lat":-17.393733,"lon":-66.1764849},{"id":800044053,"name":"Avenida Carlos Blanco Galindo y Avenida Confederación","lat":-17.3938393,"lon":-66.1740147},{"id":13416534064,"name":"Avenida Carlos Blanco Galindo","lat":-17.3939959,"lon":-66.171351},{"id":13416534061,"name":"Avenida Carlos Blanco Galindo y Rotonda Carlos Blanco Galindo y Perú","lat":-17.3940604,"lon":-66.1707777},{"id":13416534071,"name":"Rotonda Carlos Blanco Galindo y Perú y Avenida General Campero","lat":-17.3940986,"lon":-66.1706843},{"id":13303071581,"name":"Rotonda Carlos Blanco Galindo y Perú y Avenida Carlos Blanco Galindo","lat":-17.3940823,"lon":-66.1705706},{"id":13416534073,"name":"Avenida Carlos Blanco Galindo","lat":-17.3941299,"lon":-66.1703542},{"id":800044036,"name":"Avenida Carlos Blanco Galindo","lat":-17.3941568,"lon":-66.1683519},{"id":4732874466,"name":"Avenida Carlos Blanco Galindo","lat":-17.3941365,"lon":-66.1676034},{"id":315942232,"name":"Avenida Carlos Blanco Galindo y Puente 14 de Enero","lat":-17.394114,"lon":-66.1673762},{"id":8147129096,"name":"Avenida Heroínas de la Coronilla","lat":-17.3940263,"lon":-66.1666089},{"id":1636978219,"name":"Avenida Heroínas de la Coronilla","lat":-17.3938936,"lon":-66.166192},{"id":10792253186,"name":"Avenida Heroínas de la Coronilla","lat":-17.3935005,"lon":-66.1639803},{"id":698492322,"name":"Avenida Heroínas de la Coronilla y Calle Tumusla","lat":-17.3931798,"lon":-66.1620531},{"id":2694171670,"name":"Avenida Heroínas de la Coronilla","lat":-17.3930004,"lon":-66.1609788},{"id":2694171664,"name":"Avenida Heroínas de la Coronilla","lat":-17.3928215,"lon":-66.1598656},{"id":2295541620,"name":"Avenida Heroínas de la Coronilla","lat":-17.3926578,"lon":-66.1589237},{"id":3635441114,"name":"Avenida Ayacucho","lat":-17.3935139,"lon":-66.1586938},{"id":648546079,"name":"Avenida Ayacucho","lat":-17.3946244,"lon":-66.1584685},{"id":2331302377,"name":"Avenida Ayacucho","lat":-17.3957154,"lon":-66.1582695},{"id":648546085,"name":"Avenida Ayacucho y Calle Batalla de Calama","lat":-17.3967147,"lon":-66.1581304},{"id":648546087,"name":"Avenida Ayacucho y Calle Uruguay","lat":-17.3989265,"lon":-66.1577782},{"id":310262704,"name":"Avenida Ayacucho y Calle Uruguay","lat":-17.3989051,"lon":-66.1576879},{"id":310501000,"name":"Calle Uruguay y Calle Nataniel Aguirre","lat":-17.3986551,"lon":-66.1565799},{"id":1727306401,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3994887,"lon":-66.1564374},{"id":310502881,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3995781,"lon":-66.1564225},{"id":310502882,"name":"Calle Nataniel Aguirre y Calle Ismael Montes","lat":-17.4007931,"lon":-66.1561989},{"id":2577975158,"name":"Calle Nataniel Aguirre y Calle Punata","lat":-17.4022946,"lon":-66.1559112},{"id":702511964,"name":"Calle Esteban Arze y Calle Honduras","lat":-17.4013426,"lon":-66.1552573},{"id":310503058,"name":"Calle Ismael Montes y Calle Esteban Arze","lat":-17.4006491,"lon":-66.1552182},{"id":8238772507,"name":"Calle Esteban Arze","lat":-17.3999701,"lon":-66.1551794},{"id":648548822,"name":"Avenida Aroma y Calle Esteban Arze","lat":-17.3993376,"lon":-66.1552833},{"id":1727306404,"name":"Avenida Aroma y Calle Esteban Arze","lat":-17.3992471,"lon":-66.1553036},{"id":310501001,"name":"Calle Uruguay y Calle Esteban Arze","lat":-17.39841,"lon":-66.1554698},{"id":310500794,"name":"Calle Ladislao Cabrera y Calle Esteban Arze","lat":-17.3973663,"lon":-66.1556929},{"id":8241410036,"name":"Calle Esteban Arze","lat":-17.3966238,"lon":-66.1558309},{"id":310500546,"name":"Calle 25 de Mayo y Calle Batalla de Calama","lat":-17.3961338,"lon":-66.1547941},{"id":308300467,"name":"Avenida General José de San Martín y Calle Batalla de Calama","lat":-17.3959471,"lon":-66.1537317},{"id":308300466,"name":"Avenida General José de San Martín","lat":-17.3948923,"lon":-66.1539225},{"id":315103283,"name":"Avenida General José de San Martín","lat":-17.3944121,"lon":-66.154011},{"id":303217863,"name":"Avenida General José de San Martín y Calle José Antonio de Sucre","lat":-17.3938613,"lon":-66.1541124},{"id":308300565,"name":"Avenida General José de San Martín y Calle Simon Bolívar","lat":-17.3928243,"lon":-66.1543214},{"id":698492397,"name":"Avenida General José de San Martín y Avenida Heroínas de la Coronilla","lat":-17.3918758,"lon":-66.1545005},{"id":303218728,"name":"Avenida Heroínas de la Coronilla y Avenida General José de San Martín","lat":-17.3917873,"lon":-66.1545177},{"id":10008644757,"name":"Avenida General José de San Martín","lat":-17.3907655,"lon":-66.1547116},{"id":308306726,"name":"Calle Guerrilleros José Miguel Lanza y Calle República de Colombia","lat":-17.3904922,"lon":-66.1536219},{"id":308306727,"name":"Calle Mariano Antezana y Calle República de Colombia","lat":-17.3902546,"lon":-66.1525071},{"id":308306728,"name":"Calle 16 de Julio y Calle República de Colombia","lat":-17.390025,"lon":-66.1514143},{"id":9400884786,"name":"Avenida Aniceto Arce","lat":-17.3896792,"lon":-66.1500285},{"id":6179473251,"name":"Avenida Aniceto Arce","lat":-17.3874105,"lon":-66.1484621},{"id":6179473097,"name":"Avenida Aniceto Arce","lat":-17.3860425,"lon":-66.1475078},{"id":9930862750,"name":"Avenida Aniceto Arce","lat":-17.3841188,"lon":-66.1461942},{"id":1637456494,"name":"Avenida Aniceto Arce","lat":-17.3807254,"lon":-66.1438563},{"id":2391341654,"name":"Avenida Aniceto Arce","lat":-17.3792329,"lon":-66.1428114},{"id":9353076786,"name":"Avenida Aniceto Arce y Rotonda Ramón Rivero y General Galindo León","lat":-17.3790847,"lon":-66.1423139},{"id":6331635784,"name":"Rotonda Ramón Rivero y General Galindo León","lat":-17.3791273,"lon":-66.1421811},{"id":9353076789,"name":"Rotonda Ramón Rivero y General Galindo León","lat":-17.3790326,"lon":-66.142099},{"id":8172711431,"name":"Innominada","lat":-17.3788783,"lon":-66.1421161},{"id":1795293379,"name":"Avenida General Galindo León y Rotonda Cámara de Comercio","lat":-17.3776949,"lon":-66.1422199},{"id":1795293348,"name":"Rotonda Cámara de Comercio","lat":-17.3774952,"lon":-66.1421934},{"id":2389107311,"name":"Avenida General Galindo León","lat":-17.3773105,"lon":-66.1423592},{"id":2389107301,"name":"Avenida General Galindo León","lat":-17.3767615,"lon":-66.142481},{"id":698492587,"name":"Avenida General Galindo León y Calle Mariano Melgarejo","lat":-17.3749628,"lon":-66.1427052},{"id":10830782194,"name":"Plaza Tarija","lat":-17.3739395,"lon":-66.1426346},{"id":1785473274,"name":"Avenida América y Calle Rosendo Villalobos","lat":-17.3738708,"lon":-66.1416102},{"id":9276752239,"name":"Avenida América","lat":-17.3740376,"lon":-66.1388488},{"id":8509264252,"name":"Avenida América","lat":-17.3740798,"lon":-66.1381326},{"id":1796486602,"name":"Avenida América","lat":-17.3741736,"lon":-66.1372099},{"id":11987099446,"name":"Rotonda Benito Juárez","lat":-17.3742654,"lon":-66.1370104},{"id":11987099441,"name":"Rotonda Benito Juárez","lat":-17.3742931,"lon":-66.1368541},{"id":11079121781,"name":"Rotonda Benito Juárez","lat":-17.3740803,"lon":-66.1367514},{"id":5605166011,"name":"Avenida Uyuni","lat":-17.3729032,"lon":-66.1367915},{"id":11987099418,"name":"Avenida Circunvalación","lat":-17.3728479,"lon":-66.1360835},{"id":6835289597,"name":"Avenida Circunvalación","lat":-17.3727806,"lon":-66.1351908},{"id":13368859879,"name":"Avenida Circunvalación","lat":-17.3725714,"lon":-66.1341027},{"id":602990152,"name":"Avenida Circunvalación","lat":-17.3724275,"lon":-66.1330653},{"id":602990159,"name":"Avenida Circunvalación","lat":-17.3731471,"lon":-66.1309399},{"id":602990163,"name":"Avenida Circunvalación","lat":-17.3732694,"lon":-66.1298549},{"id":1008238282,"name":"Avenida Circunvalación y Calle 6 de Junio","lat":-17.3735261,"lon":-66.1289941},{"id":11071563642,"name":"Avenida 6 de Junio y Avenida Circunvalación","lat":-17.3735513,"lon":-66.1288841},{"id":1044378998,"name":"Avenida Circunvalación","lat":-17.3735386,"lon":-66.1271409},{"id":1008238325,"name":"Calle María Quiroga Vargas","lat":-17.372613,"lon":-66.1262537},{"id":1008238324,"name":"Avenida General Bernardino Bilbao Rioja y Calle Rene Fernández B.","lat":-17.3703392,"lon":-66.1277529},{"id":11595758318,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3702889,"lon":-66.1259229},{"id":8436201476,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3702143,"lon":-66.1238569},{"id":11140372095,"name":"Calle José Curtinas","lat":-17.3701651,"lon":-66.1236069},{"id":1046716560,"name":"Calle Papa León XIII y Calle José Curtinas","lat":-17.3696178,"lon":-66.123681},{"id":1046716536,"name":"Calle José Curtinas","lat":-17.3683358,"lon":-66.1244939},{"id":3292825057,"name":"Avenida Ramón Espinoza y Calle Manuel Ugarte","lat":-17.3666934,"lon":-66.1250264},{"id":1046715827,"name":"Avenida Ramón Espinoza","lat":-17.3664085,"lon":-66.1245778},{"id":2319257576,"name":"Avenida Ramón Espinoza","lat":-17.3655902,"lon":-66.1234949}],"coordinates":[[-66.2000246,-17.381278],[-66.2000475,-17.3818615],[-66.2000739,-17.3825164],[-66.2001449,-17.3838141],[-66.2001699,-17.3843237],[-66.2001888,-17.3847972],[-66.2002259,-17.3854764],[-66.2014896,-17.3850607],[-66.2017105,-17.3849651],[-66.2017654,-17.3849413],[-66.2018313,-17.384912],[-66.2023188,-17.3846951],[-66.2024982,-17.3846274],[-66.2027588,-17.3845629],[-66.2027512,-17.3846751],[-66.2028379,-17.3855672],[-66.2029167,-17.3864933],[-66.2029565,-17.3869718],[-66.2030394,-17.3882484],[-66.203066,-17.3885504],[-66.2024042,-17.3885845],[-66.2020323,-17.3886037],[-66.2020667,-17.3892001],[-66.202069,-17.3892546],[-66.2019802,-17.3892589],[-66.201419,-17.3892899],[-66.200743,-17.3893217],[-66.2006749,-17.3879771],[-66.2000166,-17.3880326],[-66.1993383,-17.3880789],[-66.1992688,-17.3880847],[-66.1992128,-17.3874389],[-66.1991593,-17.3867837],[-66.199116,-17.3861513],[-66.1990714,-17.3861189],[-66.1990273,-17.3860929],[-66.1989832,-17.3860836],[-66.1989446,-17.3860851],[-66.1988798,-17.386093],[-66.1980579,-17.3865033],[-66.1979284,-17.3865705],[-66.1976982,-17.3866731],[-66.1973102,-17.386849],[-66.1970625,-17.3869559],[-66.196898,-17.3870065],[-66.1966102,-17.3870875],[-66.196543,-17.3871023],[-66.1964558,-17.3871091],[-66.1963971,-17.3871078],[-66.1963086,-17.3870862],[-66.195837,-17.3869571],[-66.1956529,-17.3869067],[-66.195564,-17.3868823],[-66.1954212,-17.3868698],[-66.1954046,-17.3868684],[-66.1950256,-17.3868764],[-66.1949018,-17.3868763],[-66.1939251,-17.3868975],[-66.193812,-17.3868999],[-66.1939695,-17.3879776],[-66.1941707,-17.389462],[-66.1943767,-17.3908588],[-66.1941436,-17.3908577],[-66.1931847,-17.3908489],[-66.1924165,-17.3908433],[-66.1913886,-17.3908357],[-66.1913023,-17.3906006],[-66.1902747,-17.3905938],[-66.1895951,-17.3906459],[-66.1888642,-17.3907311],[-66.1881415,-17.3908284],[-66.1874158,-17.3909066],[-66.1867127,-17.3909958],[-66.1859821,-17.3910851],[-66.185928,-17.3910927],[-66.185902,-17.3910964],[-66.185515,-17.3911509],[-66.1850393,-17.3912106],[-66.1845135,-17.3912795],[-66.1844891,-17.3912828],[-66.1837242,-17.3913696],[-66.1839789,-17.3920868],[-66.1840019,-17.3922009],[-66.1842174,-17.3927838],[-66.1842945,-17.3930119],[-66.1843153,-17.3930735],[-66.1843653,-17.3930853],[-66.184412,-17.3931062],[-66.1844416,-17.3931258],[-66.1844682,-17.3931491],[-66.1844911,-17.3931756],[-66.1845103,-17.3932056],[-66.1845214,-17.3932289],[-66.1845299,-17.3932531],[-66.1845359,-17.393278],[-66.1845391,-17.3933033],[-66.1845396,-17.3933288],[-66.1845374,-17.3933542],[-66.1845324,-17.3933793],[-66.1845248,-17.3934037],[-66.1845056,-17.393444],[-66.1844906,-17.3934664],[-66.1844731,-17.3934872],[-66.184446,-17.3935122],[-66.1844155,-17.3935332],[-66.1843778,-17.3935516],[-66.1843492,-17.393561],[-66.1843197,-17.3935673],[-66.1842896,-17.3935702],[-66.1842594,-17.3935698],[-66.1842277,-17.3935658],[-66.1841921,-17.3935566],[-66.1841583,-17.3935428],[-66.1841244,-17.3935229],[-66.184094,-17.3934983],[-66.1840679,-17.3934696],[-66.1837667,-17.3934848],[-66.1830779,-17.3935189],[-66.1828126,-17.3934473],[-66.1818302,-17.393494],[-66.1810597,-17.3935298],[-66.1801494,-17.3935677],[-66.1795661,-17.3935933],[-66.1776738,-17.3936785],[-66.1772788,-17.3936967],[-66.1766698,-17.3937248],[-66.176607,-17.3937277],[-66.1764849,-17.393733],[-66.1763233,-17.3937399],[-66.1746071,-17.3938138],[-66.1740147,-17.3938393],[-66.1739096,-17.3938439],[-66.1724045,-17.3939064],[-66.172135,-17.3939606],[-66.171351,-17.3939959],[-66.1711564,-17.3940107],[-66.1708685,-17.3940485],[-66.1708359,-17.3940528],[-66.1707777,-17.3940604],[-66.1707491,-17.3940782],[-66.1707177,-17.394089],[-66.1706843,-17.3940986],[-66.1706577,-17.3941006],[-66.1706312,-17.3940991],[-66.170605,-17.3940943],[-66.1705706,-17.3940823],[-66.1705363,-17.3940981],[-66.1705029,-17.3941101],[-66.1703542,-17.3941299],[-66.1692179,-17.3941727],[-66.16885,-17.3941349],[-66.1687489,-17.3941394],[-66.1683519,-17.3941568],[-66.1680676,-17.3941641],[-66.1679544,-17.3941685],[-66.1678047,-17.3941549],[-66.1676034,-17.3941365],[-66.1674792,-17.3941219],[-66.167405,-17.3941166],[-66.1673762,-17.394114],[-66.1669627,-17.3940655],[-66.1669372,-17.3940636],[-66.1666985,-17.3940382],[-66.1666089,-17.3940263],[-66.1665145,-17.3940046],[-66.166338,-17.3939312],[-66.1662729,-17.3939109],[-66.166192,-17.3938936],[-66.165909,-17.3938483],[-66.1649058,-17.3936696],[-66.1639803,-17.3935005],[-66.1639145,-17.3934885],[-66.1638608,-17.3934796],[-66.1621491,-17.3931957],[-66.1620531,-17.3931798],[-66.1619793,-17.3931673],[-66.1611143,-17.3930202],[-66.1610467,-17.3930087],[-66.1609788,-17.3930004],[-66.1599503,-17.3928359],[-66.1599057,-17.3928281],[-66.1598656,-17.3928215],[-66.1598253,-17.3928149],[-66.1590375,-17.3926786],[-66.1590176,-17.392675],[-66.1589237,-17.3926578],[-66.1588624,-17.3926465],[-66.1588503,-17.3927102],[-66.1586938,-17.3935139],[-66.1586779,-17.3935864],[-66.1586694,-17.3936298],[-66.1584851,-17.3945425],[-66.1584685,-17.3946244],[-66.1584596,-17.3946726],[-66.1582846,-17.3956252],[-66.1582776,-17.3956693],[-66.1582695,-17.3957154],[-66.1582518,-17.3958179],[-66.1581359,-17.3966716],[-66.1581304,-17.3967147],[-66.1581237,-17.3967678],[-66.1579692,-17.3977363],[-66.157959,-17.397794],[-66.1579492,-17.3978569],[-66.1577782,-17.3989265],[-66.1576879,-17.3989051],[-66.1565799,-17.3986551],[-66.1564374,-17.3994887],[-66.1564225,-17.3995781],[-66.1561989,-17.4007931],[-66.1561157,-17.4013136],[-66.1559482,-17.4021963],[-66.1559112,-17.4022946],[-66.1554199,-17.4023008],[-66.1553165,-17.4021915],[-66.1552573,-17.4013426],[-66.1552182,-17.4006491],[-66.1551769,-17.4001495],[-66.155175,-17.400035],[-66.1551794,-17.3999701],[-66.1551889,-17.3998955],[-66.1552224,-17.3996984],[-66.1552833,-17.3993376],[-66.1553036,-17.3992471],[-66.1554698,-17.39841],[-66.1555856,-17.3978682],[-66.1556929,-17.3973663],[-66.1557531,-17.3970471],[-66.1557812,-17.3968979],[-66.1558309,-17.3966238],[-66.1558465,-17.3965283],[-66.1558816,-17.3963297],[-66.1547941,-17.3961338],[-66.1537317,-17.3959471],[-66.1539142,-17.3949382],[-66.1539225,-17.3948923],[-66.1539306,-17.3948483],[-66.154001,-17.3944662],[-66.154011,-17.3944121],[-66.1541051,-17.3938959],[-66.1541124,-17.3938613],[-66.1541225,-17.3938175],[-66.1543131,-17.3928655],[-66.1543214,-17.3928243],[-66.1543276,-17.3927913],[-66.1544925,-17.3919251],[-66.1545005,-17.3918758],[-66.1545177,-17.3917873],[-66.1545292,-17.3917261],[-66.1547116,-17.3907655],[-66.1547221,-17.3907102],[-66.1544139,-17.3906514],[-66.1536219,-17.3904922],[-66.1525071,-17.3902546],[-66.1514143,-17.390025],[-66.1503293,-17.3897959],[-66.1502903,-17.3897874],[-66.1501946,-17.3897684],[-66.1501433,-17.3897582],[-66.1500862,-17.3897464],[-66.1500285,-17.3896792],[-66.1499919,-17.3896269],[-66.1498587,-17.3894366],[-66.1496274,-17.3891111],[-66.1493179,-17.3886449],[-66.148589,-17.3875935],[-66.1484621,-17.3874105],[-66.1484349,-17.3873714],[-66.1483327,-17.3872239],[-66.1483071,-17.3871874],[-66.1479354,-17.3866575],[-66.1477288,-17.386363],[-66.1475078,-17.3860425],[-66.147457,-17.3859653],[-66.1474046,-17.3858887],[-66.1462893,-17.3842572],[-66.1462628,-17.3842184],[-66.1462208,-17.3841579],[-66.1461942,-17.3841188],[-66.145645,-17.3833109],[-66.1450688,-17.3824723],[-66.1449959,-17.3823672],[-66.1442653,-17.3813172],[-66.1442009,-17.3812213],[-66.1438563,-17.3807254],[-66.1431437,-17.3796697],[-66.1429952,-17.3794509],[-66.142953,-17.3793846],[-66.1428861,-17.3792986],[-66.1428531,-17.3792608],[-66.1428114,-17.3792329],[-66.1427468,-17.3792082],[-66.1424977,-17.3791209],[-66.142442,-17.3791053],[-66.1423972,-17.3790962],[-66.1423486,-17.3790869],[-66.1423139,-17.3790847],[-66.1423073,-17.3790928],[-66.1423,-17.3791003],[-66.1422875,-17.3791105],[-66.1422737,-17.3791189],[-66.1422439,-17.3791297],[-66.1422123,-17.3791326],[-66.1421811,-17.3791273],[-66.1421524,-17.3791143],[-66.1421285,-17.3790956],[-66.1421178,-17.3790813],[-66.1421094,-17.3790667],[-66.1421048,-17.379056],[-66.142099,-17.3790326],[-66.1420987,-17.3790092],[-66.1421036,-17.3789863],[-66.1421134,-17.3789648],[-66.1421278,-17.3789459],[-66.142145,-17.3789294],[-66.1421161,-17.3788783],[-66.1421656,-17.3784026],[-66.1421874,-17.3781264],[-66.1422257,-17.3779795],[-66.1422343,-17.3778571],[-66.1422303,-17.3777737],[-66.1422199,-17.3776949],[-66.1421909,-17.3776639],[-66.1421731,-17.3776255],[-66.1421671,-17.377586],[-66.1421707,-17.3775543],[-66.1421773,-17.3775296],[-66.1421934,-17.3774952],[-66.142222,-17.3774681],[-66.1422554,-17.3774507],[-66.1422947,-17.3774383],[-66.1423194,-17.3774203],[-66.1423346,-17.3774054],[-66.1423592,-17.3773105],[-66.14246,-17.3769444],[-66.1424636,-17.3769289],[-66.142464,-17.3769249],[-66.1424703,-17.3768683],[-66.1424748,-17.3768274],[-66.142481,-17.3767615],[-66.1425182,-17.376325],[-66.1425282,-17.3762196],[-66.1425928,-17.3757608],[-66.1426542,-17.3753253],[-66.1426953,-17.375031],[-66.1427052,-17.3749628],[-66.1427183,-17.3748676],[-66.142819,-17.3741845],[-66.1428047,-17.3741261],[-66.1427764,-17.3740572],[-66.1426805,-17.3739877],[-66.1426346,-17.3739395],[-66.1426047,-17.373879],[-66.1425975,-17.3738446],[-66.1424952,-17.3738329],[-66.1424073,-17.3738288],[-66.1423138,-17.3738299],[-66.1416102,-17.3738708],[-66.1413547,-17.3738847],[-66.1406024,-17.3739258],[-66.1405803,-17.3739272],[-66.1397774,-17.3739795],[-66.1396797,-17.3739858],[-66.1388488,-17.3740376],[-66.1388077,-17.3740401],[-66.1385992,-17.3740531],[-66.1385662,-17.374055],[-66.1384337,-17.3740626],[-66.1383137,-17.3740694],[-66.1381326,-17.3740798],[-66.1381031,-17.3740815],[-66.1380704,-17.3740833],[-66.1377613,-17.374101],[-66.1374497,-17.3741239],[-66.137285,-17.3741516],[-66.1372099,-17.3741736],[-66.1371383,-17.3741975],[-66.1371065,-17.3742074],[-66.1370353,-17.3742265],[-66.1370292,-17.3742406],[-66.1370216,-17.3742507],[-66.1370104,-17.3742654],[-66.1369859,-17.3742852],[-66.1369614,-17.3742973],[-66.1369348,-17.3743043],[-66.1369073,-17.3743059],[-66.13688,-17.3743021],[-66.1368541,-17.3742931],[-66.1368307,-17.3742791],[-66.1368109,-17.3742608],[-66.1367954,-17.374239],[-66.1367849,-17.3742146],[-66.1367564,-17.3741062],[-66.1367514,-17.3740803],[-66.1367521,-17.374054],[-66.1367585,-17.3740284],[-66.1367891,-17.3735156],[-66.1368302,-17.3731041],[-66.1368334,-17.3730179],[-66.1368191,-17.3729512],[-66.1367915,-17.3729032],[-66.1367573,-17.3728696],[-66.1367036,-17.3728297],[-66.1366337,-17.372782],[-66.1365427,-17.3727975],[-66.1361547,-17.3728417],[-66.1360835,-17.3728479],[-66.1359771,-17.3728572],[-66.1358602,-17.3728656],[-66.1357817,-17.3728684],[-66.1356853,-17.3728603],[-66.1354966,-17.3728322],[-66.1351908,-17.3727806],[-66.1351489,-17.3727703],[-66.1350753,-17.3727563],[-66.1347435,-17.3726933],[-66.134217,-17.3725934],[-66.1341675,-17.372584],[-66.1341027,-17.3725714],[-66.1337319,-17.3724992],[-66.1334855,-17.3724558],[-66.1333839,-17.3724325],[-66.1333491,-17.3724273],[-66.1331936,-17.3724201],[-66.1330653,-17.3724275],[-66.1326272,-17.3725546],[-66.1319916,-17.3727297],[-66.1318806,-17.3727555],[-66.1316408,-17.3728345],[-66.1311463,-17.3730495],[-66.1309399,-17.3731471],[-66.130845,-17.3731819],[-66.1307188,-17.3732067],[-66.1305431,-17.3732203],[-66.1302763,-17.3732331],[-66.1300836,-17.3732479],[-66.1298549,-17.3732694],[-66.1298225,-17.3732756],[-66.1296782,-17.3733032],[-66.1294941,-17.3733506],[-66.1293598,-17.3733943],[-66.1292169,-17.3734493],[-66.1290806,-17.3735027],[-66.1289941,-17.3735261],[-66.1288841,-17.3735513],[-66.1287924,-17.3735624],[-66.1286912,-17.3735699],[-66.1277564,-17.3735584],[-66.1276188,-17.3735546],[-66.1271409,-17.3735386],[-66.1266958,-17.3735226],[-66.1262345,-17.3735091],[-66.1262335,-17.3734096],[-66.1262537,-17.372613],[-66.1262729,-17.3718519],[-66.1263029,-17.371066],[-66.1277233,-17.371135],[-66.1277502,-17.3704123],[-66.1277529,-17.3703392],[-66.1276829,-17.3703363],[-66.1266596,-17.3703142],[-66.1265643,-17.3703112],[-66.1263394,-17.370304],[-66.1259229,-17.3702889],[-66.1257595,-17.3702829],[-66.1252487,-17.370247],[-66.1242186,-17.3702248],[-66.1238569,-17.3702143],[-66.1237094,-17.3702104],[-66.1236821,-17.3702096],[-66.1236524,-17.3702088],[-66.123606,-17.3702076],[-66.1236069,-17.3701651],[-66.1236085,-17.3701294],[-66.1236264,-17.369723],[-66.1236261,-17.3696916],[-66.123681,-17.3696178],[-66.1239278,-17.3691984],[-66.1239974,-17.3690868],[-66.1240506,-17.3690123],[-66.1244309,-17.3684254],[-66.1244939,-17.3683358],[-66.1248525,-17.3677954],[-66.1252263,-17.3672431],[-66.1254027,-17.3669953],[-66.1249832,-17.3667373],[-66.1250264,-17.3666934],[-66.1248806,-17.3665774],[-66.1247977,-17.3665348],[-66.1246642,-17.3664581],[-66.1245778,-17.3664085],[-66.1239446,-17.3659293],[-66.1238075,-17.365807],[-66.12369,-17.3656911],[-66.1236319,-17.3656426],[-66.123554,-17.3656114],[-66.1234949,-17.3655902]],"osmUrl":"https://www.openstreetmap.org/relation/10721087","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"ida","directionId":1},{"osmId":10720900,"ref":"133","name":"MiniBus 133: Calle Federico del Carpio → Avenida Tadeo Haenke","from":"Calle Federico del Carpio","to":"Avenida Tadeo Haenke","description":"","tripHeadsign":"Avenida Tadeo Haenke","routeType":"bus","gtfsRouteId":106,"routeColor":"888888","stopCount":121,"stops":[{"id":2319257576,"name":"Avenida Ramón Espinoza","lat":-17.3655902,"lon":-66.1234949},{"id":2319257591,"name":"Avenida Ramón Espinoza","lat":-17.365807,"lon":-66.1238075},{"id":10925434672,"name":"Avenida Ramón Espinoza","lat":-17.3664581,"lon":-66.1246642},{"id":3289608120,"name":"Calle Manuel Ugarte y Avenida Ramón Espinoza","lat":-17.3666572,"lon":-66.1250625},{"id":1046715701,"name":"Calle José Curtinas y Avenida Ramón Espinoza","lat":-17.3669953,"lon":-66.1254027},{"id":1046717075,"name":"Calle José Curtinas","lat":-17.3684254,"lon":-66.1244309},{"id":1046716579,"name":"Calle José Curtinas","lat":-17.3691984,"lon":-66.1239278},{"id":1046717703,"name":"Calle Ramón Céspedes y Calle Papa León XIII","lat":-17.3696787,"lon":-66.1253902},{"id":1046715991,"name":"Calle Papa León XIII","lat":-17.3697654,"lon":-66.1281678},{"id":1008238324,"name":"Avenida General Bernardino Bilbao Rioja y Calle Rene Fernández B.","lat":-17.3703392,"lon":-66.1277529},{"id":1008238361,"name":"Calle Rene Fernández B.","lat":-17.3718921,"lon":-66.1276795},{"id":11071563641,"name":"Avenida Circunvalación y Avenida 6 de Junio","lat":-17.3734559,"lon":-66.1288718},{"id":601870928,"name":"Avenida Circunvalación y Calle 6 de Junio","lat":-17.3734272,"lon":-66.1289804},{"id":3287949025,"name":"Avenida Circunvalación","lat":-17.3731739,"lon":-66.129686},{"id":1044379829,"name":"Avenida Circunvalación","lat":-17.3729845,"lon":-66.1310179},{"id":4172517089,"name":"Avenida Circunvalación","lat":-17.3723128,"lon":-66.1331659},{"id":807968574,"name":"Avenida Circunvalación","lat":-17.3724718,"lon":-66.1341739},{"id":1171505048,"name":"Avenida Circunvalación","lat":-17.372736,"lon":-66.1355236},{"id":11073662405,"name":"Avenida Circunvalación","lat":-17.3727406,"lon":-66.1361302},{"id":2394199562,"name":"Avenida Circunvalación","lat":-17.3726376,"lon":-66.1367319},{"id":5605166004,"name":"Avenida Uyuni","lat":-17.3730029,"lon":-66.1369073},{"id":11987099447,"name":"Avenida América","lat":-17.3739669,"lon":-66.1370259},{"id":8509264286,"name":"Avenida América","lat":-17.3739923,"lon":-66.1379938},{"id":9973573068,"name":"Avenida América","lat":-17.3738792,"lon":-66.1397715},{"id":1785473214,"name":"Avenida América","lat":-17.3736651,"lon":-66.1424961},{"id":1785473234,"name":"Plaza Tarija","lat":-17.3734461,"lon":-66.1427978},{"id":1785473612,"name":"Plaza Tarija","lat":-17.3735363,"lon":-66.1432095},{"id":1785473511,"name":"Plaza Tarija","lat":-17.3739292,"lon":-66.1432451},{"id":2590032472,"name":"Avenida General Galindo León","lat":-17.3748707,"lon":-66.1428264},{"id":8373677218,"name":"Avenida General Galindo León","lat":-17.3762351,"lon":-66.142619},{"id":1637609914,"name":"Avenida General Galindo León","lat":-17.3769365,"lon":-66.1425292},{"id":1795293270,"name":"Avenida General Galindo León y Rotonda Cámara de Comercio","lat":-17.377476,"lon":-66.1424219},{"id":1795293377,"name":"Rotonda Cámara de Comercio","lat":-17.3776704,"lon":-66.1424359},{"id":1795293299,"name":"Innominada","lat":-17.378833,"lon":-66.1424117},{"id":8379904343,"name":"Avenida Aniceto Arce","lat":-17.379109,"lon":-66.1430678},{"id":2391341667,"name":"Avenida Aniceto Arce","lat":-17.3793728,"lon":-66.1430676},{"id":8388301598,"name":"Avenida Aniceto Arce","lat":-17.3809972,"lon":-66.1441407},{"id":312425660,"name":"Avenida Aniceto Arce y Calle Eufronio Viscarra y Calle Juan de la Cruz Torrez y Calle Samuel de Ugarte","lat":-17.3824805,"lon":-66.1451665},{"id":312425828,"name":"Avenida Aniceto Arce y Calle Doctor Germán Urquidi","lat":-17.3859308,"lon":-66.1475139},{"id":9031318856,"name":"Avenida Aniceto Arce","lat":-17.3872198,"lon":-66.1484094},{"id":312425956,"name":"Avenida Aniceto Arce y Calle Luis Pasteur","lat":-17.3885389,"lon":-66.1493366},{"id":315096054,"name":"Avenida Aniceto Arce y Calle Luis Pasteur","lat":-17.3886449,"lon":-66.1493179},{"id":2524491857,"name":"Calle Luis Pasteur","lat":-17.390703,"lon":-66.148919},{"id":2524491871,"name":"Calle Luis Pasteur","lat":-17.3917663,"lon":-66.1487038},{"id":9602314660,"name":"Calle Simon Bolívar","lat":-17.3919344,"lon":-66.14925},{"id":8515866936,"name":"Calle Simón Bolívar","lat":-17.3921352,"lon":-66.1504108},{"id":310256285,"name":"Calle Simon Bolívar y Calle Mariano Antezana","lat":-17.3924306,"lon":-66.152094},{"id":8964738193,"name":"Calle Simon Bolívar","lat":-17.392816,"lon":-66.1542733},{"id":8964738182,"name":"Calle Simon Bolívar","lat":-17.3928826,"lon":-66.154655},{"id":9884051885,"name":"Calle 25 de Mayo","lat":-17.3935814,"lon":-66.1552725},{"id":4933190239,"name":"Calle 25 de Mayo","lat":-17.3945552,"lon":-66.1551015},{"id":2681342488,"name":"Calle 25 de Mayo","lat":-17.3950347,"lon":-66.155014},{"id":3719465042,"name":"Calle 25 de Mayo","lat":-17.3960527,"lon":-66.1548104},{"id":310500794,"name":"Calle Ladislao Cabrera y Calle Esteban Arze","lat":-17.3973663,"lon":-66.1556929},{"id":310500795,"name":"Calle Ladislao Cabrera y Calle Nataniel Aguirre","lat":-17.3975624,"lon":-66.15678},{"id":310501000,"name":"Calle Uruguay y Calle Nataniel Aguirre","lat":-17.3986551,"lon":-66.1565799},{"id":1727306401,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3994887,"lon":-66.1564374},{"id":310502881,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3995781,"lon":-66.1564225},{"id":310502882,"name":"Calle Nataniel Aguirre y Calle Ismael Montes","lat":-17.4007931,"lon":-66.1561989},{"id":2933770663,"name":"Calle Nataniel Aguirre","lat":-17.4013136,"lon":-66.1561157},{"id":323982551,"name":"Calle Punata y Calle Agustín López","lat":-17.4022092,"lon":-66.1566669},{"id":310262503,"name":"Calle Punata y Avenida Ayacucho","lat":-17.4022321,"lon":-66.157327},{"id":9652874536,"name":"Avenida Ayacucho","lat":-17.4015643,"lon":-66.1574144},{"id":310262504,"name":"Calle Ismael Montes y Avenida Ayacucho","lat":-17.4009863,"lon":-66.1574786},{"id":9593572483,"name":"Avenida Ayacucho","lat":-17.4009417,"lon":-66.1574843},{"id":315111095,"name":"Avenida Aroma y Avenida Ayacucho","lat":-17.3994821,"lon":-66.1576362},{"id":1727306403,"name":"Avenida Ayacucho y Avenida Aroma","lat":-17.3993655,"lon":-66.1576356},{"id":310262706,"name":"Avenida Ayacucho y Calle Ladislao Cabrera","lat":-17.3977786,"lon":-66.1578813},{"id":2398944603,"name":"Avenida Ayacucho","lat":-17.3966561,"lon":-66.1580448},{"id":9567239716,"name":"Avenida Ayacucho","lat":-17.3946561,"lon":-66.1583705},{"id":310262961,"name":"Avenida Ayacucho","lat":-17.3935676,"lon":-66.1585844},{"id":308297344,"name":"Avenida Heroínas de la Coronilla y Avenida Ayacucho","lat":-17.3925424,"lon":-66.1587863},{"id":2295541569,"name":"Calle Republica de Colombia","lat":-17.3914514,"lon":-66.1589684},{"id":2295541594,"name":"Avenida Heroínas de la Coronilla","lat":-17.3923713,"lon":-66.1577984},{"id":648546083,"name":"Avenida Heroínas de la Coronilla y Avenida Ayacucho","lat":-17.3925589,"lon":-66.158879},{"id":2694171663,"name":"Avenida Heroínas de la Coronilla","lat":-17.3927397,"lon":-66.1599716},{"id":2694171669,"name":"Avenida Heroínas de la Coronilla","lat":-17.392944,"lon":-66.1611287},{"id":308297347,"name":"Avenida Heroínas de la Coronilla y Calle Tumusla","lat":-17.3931073,"lon":-66.1620628},{"id":308297348,"name":"Calle Falsuri y Avenida Heroínas de la Coronilla","lat":-17.3934182,"lon":-66.1639278},{"id":9515033287,"name":"Avenida Heroínas de la Coronilla","lat":-17.39382,"lon":-66.1661485},{"id":315936460,"name":"Avenida Heroínas de la Coronilla","lat":-17.3938412,"lon":-66.1666104},{"id":7353579718,"name":"Avenida Carlos Blanco Galindo y Avenida Humboldt","lat":-17.3939742,"lon":-66.1673761},{"id":497205202,"name":"Avenida Carlos Blanco Galindo y Avenida Humboldt","lat":-17.3939109,"lon":-66.1678276},{"id":563279534,"name":"Avenida Carlos Blanco Galindo","lat":-17.3938639,"lon":-66.1683952},{"id":12678181847,"name":"Avenida Carlos Blanco Galindo","lat":-17.3938462,"lon":-66.1687744},{"id":13416534074,"name":"Avenida Carlos Blanco Galindo","lat":-17.3937428,"lon":-66.170464},{"id":13416534040,"name":"Rotonda Carlos Blanco Galindo y Perú","lat":-17.3937242,"lon":-66.1706268},{"id":13303071587,"name":"Rotonda Carlos Blanco Galindo y Perú y Avenida Carlos Blanco Galindo","lat":-17.3937374,"lon":-66.1707334},{"id":13436362650,"name":"Avenida Carlos Blanco Galindo","lat":-17.3937045,"lon":-66.170857},{"id":563279515,"name":"Avenida Carlos Blanco Galindo y Calle Francisco Pizarro","lat":-17.3935555,"lon":-66.173901},{"id":9081435138,"name":"Avenida Carlos Blanco Galindo","lat":-17.3936962,"lon":-66.1744538},{"id":2339557951,"name":"Avenida Carlos Blanco Galindo","lat":-17.393604,"lon":-66.1765758},{"id":560522668,"name":"Avenida Blanco Galindo y Avenida Carlos Blanco Galindo y Calle La Plata","lat":-17.3935123,"lon":-66.1785862},{"id":4398499281,"name":"Avenida Carlos Blanco Galindo","lat":-17.3933316,"lon":-66.1827965},{"id":2635402927,"name":"Avenida Carlos Blanco Galindo y Calle Héroes Nacionales","lat":-17.3931593,"lon":-66.1866393},{"id":12723607293,"name":"Calle Caracoles","lat":-17.3929227,"lon":-66.1874083},{"id":560522464,"name":"Calle Moisés Monroy","lat":-17.3909066,"lon":-66.1874158},{"id":560522456,"name":"Calle Moisés Monroy","lat":-17.3905938,"lon":-66.1902747},{"id":560522458,"name":"Calle Antonio Gonzales y Calle Humberto Iporre","lat":-17.389705,"lon":-66.1908612},{"id":560522405,"name":"Calle Antonio Montes y Calle Antonio Gonzales","lat":-17.389478,"lon":-66.1936277},{"id":9701698776,"name":"Calle Juan Claure","lat":-17.3891758,"lon":-66.1953648},{"id":560522425,"name":"Calle Juan Claure y Calle Iván Bluske","lat":-17.3879525,"lon":-66.195184},{"id":560522433,"name":"Avenida d'Orbigny y Calle Juan Claure","lat":-17.3867481,"lon":-66.1948894},{"id":3265528155,"name":"Avenida d'Orbigny","lat":-17.3868052,"lon":-66.1958005},{"id":9316680352,"name":"Avenida d'Orbigny","lat":-17.3869387,"lon":-66.1965395},{"id":560522423,"name":"Avenida d'Orbigny","lat":-17.3864186,"lon":-66.1979249},{"id":3263807769,"name":"Avenida d'Orbigny y Rotonda d'Orbigny y Juan Pablo II","lat":-17.3858489,"lon":-66.1990775},{"id":3263807767,"name":"Rotonda d'Orbigny y Juan Pablo II y Avenida Juan Pablo II","lat":-17.3858022,"lon":-66.1991097},{"id":9355419497,"name":"Rotonda d'Orbigny y Juan Pablo II","lat":-17.3857854,"lon":-66.1991857},{"id":560084609,"name":"Rotonda d'Orbigny y Juan Pablo II","lat":-17.3858189,"lon":-66.1992429},{"id":9355419498,"name":"Rotonda d'Orbigny y Juan Pablo II","lat":-17.385882,"lon":-66.199263},{"id":560084597,"name":"Rotonda d'Orbigny y Juan Pablo II y Avenida Juan Pablo II","lat":-17.3859326,"lon":-66.1992423},{"id":8670188778,"name":"Avenida Juan Pablo II","lat":-17.3869605,"lon":-66.1992394},{"id":548128152,"name":"Calle Reverendo Maurice Lefevre y Calle Pedro José Cayetano de la Llosa","lat":-17.3893217,"lon":-66.200743},{"id":9316729780,"name":"Calle Monseñor Francisco Cano Galvarro","lat":-17.3892001,"lon":-66.2020667},{"id":560084589,"name":"Calle Gaspar de Villarroel y Calle Arzobispo A. Gutierrez Granier","lat":-17.3885504,"lon":-66.203066},{"id":560084613,"name":"Calle Arzobispo Armando Gutiérrez Granier y Calle Cayetano Agramont","lat":-17.3855672,"lon":-66.2028379},{"id":10875062210,"name":"Avenida d'Orbigny","lat":-17.3850082,"lon":-66.2018807},{"id":10875062226,"name":"Avenida d'Orbigny","lat":-17.3855202,"lon":-66.2004342},{"id":2160418471,"name":"Calle Andrés S. Muñoz","lat":-17.3847972,"lon":-66.2001888},{"id":7996545533,"name":"Avenida Tadeo Haenke y Calle Andrés S. Muñoz","lat":-17.381278,"lon":-66.2000246}],"coordinates":[[-66.1234949,-17.3655902],[-66.123554,-17.3656114],[-66.1236319,-17.3656426],[-66.12369,-17.3656911],[-66.1238075,-17.365807],[-66.1239446,-17.3659293],[-66.1245778,-17.3664085],[-66.1246642,-17.3664581],[-66.1247977,-17.3665348],[-66.1248806,-17.3665774],[-66.1250264,-17.3666934],[-66.1250625,-17.3666572],[-66.1253709,-17.3668369],[-66.125485,-17.366891],[-66.1254027,-17.3669953],[-66.1252263,-17.3672431],[-66.1248525,-17.3677954],[-66.1244939,-17.3683358],[-66.1244309,-17.3684254],[-66.1240506,-17.3690123],[-66.1239974,-17.3690868],[-66.1239278,-17.3691984],[-66.123681,-17.3696178],[-66.1237552,-17.3696385],[-66.1252812,-17.369679],[-66.1253902,-17.3696787],[-66.1266865,-17.3697192],[-66.1280944,-17.3697631],[-66.1281678,-17.3697654],[-66.1284232,-17.3702238],[-66.1284169,-17.3703589],[-66.1278164,-17.3703403],[-66.1277529,-17.3703392],[-66.1277502,-17.3704123],[-66.1277233,-17.371135],[-66.1276795,-17.3718921],[-66.1276511,-17.3726604],[-66.1276215,-17.3734599],[-66.1286377,-17.3734742],[-66.1287806,-17.373469],[-66.1288718,-17.3734559],[-66.1289804,-17.3734272],[-66.1290673,-17.3733898],[-66.1291753,-17.3733341],[-66.1293134,-17.3732714],[-66.1294557,-17.3732223],[-66.1295565,-17.3732012],[-66.129686,-17.3731739],[-66.1298501,-17.3731449],[-66.1303179,-17.3731127],[-66.1306023,-17.3730894],[-66.1307793,-17.373061],[-66.1309291,-17.3730212],[-66.1310179,-17.3729845],[-66.1314812,-17.3727838],[-66.1316193,-17.3727343],[-66.1318136,-17.3726612],[-66.1319085,-17.372646],[-66.1329231,-17.3723571],[-66.1330304,-17.37233],[-66.1331659,-17.3723128],[-66.1332925,-17.3723089],[-66.1333772,-17.3723184],[-66.1335092,-17.3723479],[-66.1336915,-17.3723819],[-66.1341207,-17.3724619],[-66.1341739,-17.3724718],[-66.1342413,-17.3724859],[-66.1347484,-17.3725916],[-66.1350955,-17.3726555],[-66.1351615,-17.3726676],[-66.1352161,-17.3726819],[-66.1355236,-17.372736],[-66.1356936,-17.3727606],[-66.1358009,-17.3727624],[-66.1358677,-17.3727603],[-66.1359713,-17.372756],[-66.1360713,-17.3727463],[-66.1361302,-17.3727406],[-66.1362225,-17.3727317],[-66.1364442,-17.3727058],[-66.1365705,-17.3726845],[-66.1366185,-17.3726721],[-66.1366865,-17.3726538],[-66.1367319,-17.3726376],[-66.1367986,-17.3727325],[-66.1368269,-17.3727815],[-66.1368693,-17.3728583],[-66.1368948,-17.3729174],[-66.136906,-17.3729586],[-66.1369073,-17.3730029],[-66.136881,-17.3732055],[-66.13684,-17.3734719],[-66.1368439,-17.3735544],[-66.1368742,-17.373674],[-66.1369629,-17.3739679],[-66.136975,-17.3739775],[-66.1370259,-17.3739669],[-66.1370767,-17.3739665],[-66.1371628,-17.3739898],[-66.1372619,-17.3740157],[-66.1373665,-17.3740291],[-66.1377544,-17.3740075],[-66.1379938,-17.3739923],[-66.138031,-17.3739897],[-66.1380655,-17.3739873],[-66.1387982,-17.3739417],[-66.1388403,-17.3739389],[-66.1396726,-17.3738852],[-66.1397715,-17.3738792],[-66.1405964,-17.3738295],[-66.1416003,-17.373772],[-66.1422624,-17.3737346],[-66.1423298,-17.3737222],[-66.1424276,-17.3736928],[-66.1424961,-17.3736651],[-66.1426187,-17.3736122],[-66.142654,-17.3735557],[-66.1426742,-17.3735322],[-66.1427001,-17.3735067],[-66.1427463,-17.3734725],[-66.1427978,-17.3734461],[-66.1428532,-17.373428],[-66.1429065,-17.3734193],[-66.1429606,-17.3734184],[-66.1430141,-17.3734253],[-66.143066,-17.3734399],[-66.1431441,-17.3734795],[-66.1432095,-17.3735363],[-66.1432581,-17.3736067],[-66.1432811,-17.3736636],[-66.143293,-17.3737236],[-66.1432935,-17.3737846],[-66.1432825,-17.3738447],[-66.1432451,-17.3739292],[-66.1431855,-17.3740009],[-66.1431078,-17.3740548],[-66.1430179,-17.3740869],[-66.1429705,-17.3741295],[-66.1429314,-17.3741958],[-66.1428264,-17.3748707],[-66.1428132,-17.3749632],[-66.1428008,-17.3750357],[-66.1427526,-17.3753405],[-66.1426839,-17.3757746],[-66.1426736,-17.3758395],[-66.142619,-17.3762351],[-66.142601,-17.3763647],[-66.1425808,-17.3764786],[-66.1425494,-17.3767783],[-66.1425426,-17.3768431],[-66.1425381,-17.3768848],[-66.1425292,-17.3769365],[-66.1425277,-17.3769451],[-66.1425249,-17.3769601],[-66.1424276,-17.3773273],[-66.1424039,-17.3774192],[-66.1424088,-17.3774411],[-66.1424219,-17.377476],[-66.1424376,-17.3774945],[-66.1424518,-17.3775229],[-66.1424601,-17.3775508],[-66.1424632,-17.3775797],[-66.142461,-17.3776086],[-66.1424521,-17.3776461],[-66.1424359,-17.3776704],[-66.1424598,-17.3777399],[-66.1424536,-17.3778549],[-66.1424014,-17.3784476],[-66.1423772,-17.3787495],[-66.1423857,-17.3787904],[-66.1424117,-17.378833],[-66.1424539,-17.3788802],[-66.1425271,-17.3789172],[-66.1427305,-17.3789834],[-66.1429971,-17.3790674],[-66.1430493,-17.3790829],[-66.1430678,-17.379109],[-66.1430837,-17.3791368],[-66.1430966,-17.3791658],[-66.1431016,-17.3791891],[-66.1431024,-17.3792129],[-66.1430994,-17.3792366],[-66.1430676,-17.3793728],[-66.1430688,-17.3794137],[-66.1430776,-17.379442],[-66.1430937,-17.379472],[-66.1432028,-17.3796329],[-66.1441031,-17.3809425],[-66.1441407,-17.3809972],[-66.1442263,-17.3811247],[-66.1443213,-17.3812621],[-66.1443343,-17.3812809],[-66.1443962,-17.3813704],[-66.1450554,-17.3823239],[-66.1451665,-17.3824805],[-66.145265,-17.3826252],[-66.1462641,-17.3840939],[-66.1462906,-17.3841328],[-66.1463324,-17.3841942],[-66.1463585,-17.3842326],[-66.147463,-17.385856],[-66.1475139,-17.3859308],[-66.1475669,-17.3860074],[-66.147678,-17.3861681],[-66.1477159,-17.3862228],[-66.148064,-17.3867233],[-66.1483646,-17.3871554],[-66.1484094,-17.3872198],[-66.1485012,-17.3873491],[-66.1485192,-17.3873745],[-66.1486427,-17.3875508],[-66.1488419,-17.3878325],[-66.14901,-17.38807],[-66.1491698,-17.3882995],[-66.1493366,-17.3885389],[-66.1493179,-17.3886449],[-66.1492,-17.3892545],[-66.1491441,-17.3895439],[-66.1490107,-17.3902306],[-66.148919,-17.390703],[-66.1489091,-17.3907458],[-66.1488943,-17.3908244],[-66.1488864,-17.3908667],[-66.1487038,-17.3917663],[-66.1486906,-17.3918339],[-66.1491355,-17.3919138],[-66.14925,-17.3919344],[-66.1495076,-17.3919807],[-66.1497628,-17.3920265],[-66.1498197,-17.392033],[-66.1504108,-17.3921352],[-66.150973,-17.3922345],[-66.151028,-17.3922446],[-66.1510804,-17.3922537],[-66.152094,-17.3924306],[-66.1524841,-17.3924988],[-66.1531979,-17.3926236],[-66.1538914,-17.3927509],[-66.1542733,-17.392816],[-66.1543214,-17.3928243],[-66.154388,-17.3928359],[-66.154655,-17.3928826],[-66.1553359,-17.3930017],[-66.155383,-17.3930104],[-66.1553734,-17.3930447],[-66.1552725,-17.3935814],[-66.1551933,-17.3940026],[-66.1551851,-17.3940462],[-66.1551904,-17.3941103],[-66.1551015,-17.3945552],[-66.155099,-17.3945689],[-66.155095,-17.394591],[-66.1550466,-17.3948561],[-66.155014,-17.3950347],[-66.1550064,-17.3950677],[-66.1548371,-17.3959195],[-66.1548104,-17.3960527],[-66.1547941,-17.3961338],[-66.1546703,-17.3967578],[-66.1545798,-17.3971915],[-66.1546495,-17.397201],[-66.1556929,-17.3973663],[-66.15678,-17.3975624],[-66.1565799,-17.3986551],[-66.1564374,-17.3994887],[-66.1564225,-17.3995781],[-66.1561989,-17.4007931],[-66.1561157,-17.4013136],[-66.1559482,-17.4021963],[-66.1566669,-17.4022092],[-66.157327,-17.4022321],[-66.1573377,-17.4021346],[-66.1574144,-17.4015643],[-66.1574614,-17.4011383],[-66.1574786,-17.4009863],[-66.1574843,-17.4009417],[-66.1576275,-17.3996977],[-66.1576328,-17.3995669],[-66.1576362,-17.3994821],[-66.1576356,-17.3993655],[-66.157638,-17.3993118],[-66.1576443,-17.3992052],[-66.1576879,-17.3989051],[-66.1578716,-17.3978437],[-66.1578813,-17.3977786],[-66.1578893,-17.39773],[-66.1580315,-17.3967547],[-66.1580388,-17.3967006],[-66.1580448,-17.3966561],[-66.1581681,-17.3958044],[-66.1581878,-17.3956991],[-66.1581946,-17.3956551],[-66.1582007,-17.3956153],[-66.1583705,-17.3946561],[-66.1583789,-17.3946085],[-66.1583955,-17.3945259],[-66.1585778,-17.3936167],[-66.1585844,-17.3935676],[-66.1585979,-17.3934997],[-66.1587386,-17.3927896],[-66.1587574,-17.3926949],[-66.1587699,-17.3926319],[-66.1587863,-17.3925424],[-66.1587963,-17.3924909],[-66.1590109,-17.3915018],[-66.1590212,-17.3914589],[-66.1589684,-17.3914514],[-66.1585353,-17.3913854],[-66.1579619,-17.3912877],[-66.1577628,-17.3923128],[-66.157753,-17.3923634],[-66.1577984,-17.3923713],[-66.1579623,-17.3923997],[-66.1585898,-17.3925084],[-66.158634,-17.3925161],[-66.1587059,-17.3925285],[-66.1587863,-17.3925424],[-66.158879,-17.3925589],[-66.1589397,-17.3925698],[-66.1598762,-17.3927236],[-66.1599202,-17.3927307],[-66.1599716,-17.3927397],[-66.1610041,-17.3929135],[-66.1610608,-17.3929264],[-66.1611287,-17.392944],[-66.1613786,-17.3929877],[-66.1615323,-17.3930145],[-66.1619926,-17.393095],[-66.1620628,-17.3931073],[-66.1621604,-17.3931236],[-66.1627999,-17.3932302],[-66.1638761,-17.3934096],[-66.1639278,-17.3934182],[-66.1639915,-17.39343],[-66.1649209,-17.3936022],[-66.1659169,-17.3937793],[-66.1661485,-17.39382],[-66.1661971,-17.3938251],[-66.1664389,-17.3938288],[-66.1666104,-17.3938412],[-66.1667802,-17.3938867],[-66.1669374,-17.3939373],[-66.1673519,-17.3939756],[-66.1673761,-17.3939742],[-66.167449,-17.3939739],[-66.1675661,-17.3939554],[-66.1677971,-17.3939161],[-66.1678276,-17.3939109],[-66.16786,-17.3939053],[-66.167994,-17.3938847],[-66.1680638,-17.3938779],[-66.1683952,-17.3938639],[-66.1686034,-17.3938542],[-66.1686861,-17.3938503],[-66.1687744,-17.3938462],[-66.169044,-17.3938336],[-66.169397,-17.3937798],[-66.1702232,-17.3937475],[-66.170464,-17.3937428],[-66.1705344,-17.3937414],[-66.1705703,-17.3937406],[-66.1706025,-17.3937291],[-66.1706268,-17.3937242],[-66.1706515,-17.3937223],[-66.1706764,-17.3937233],[-66.1707008,-17.3937272],[-66.1707334,-17.3937374],[-66.170806,-17.3937167],[-66.170822,-17.3937126],[-66.170857,-17.3937045],[-66.1709593,-17.3936894],[-66.1723743,-17.3936297],[-66.1724077,-17.3936281],[-66.173901,-17.3935555],[-66.1739037,-17.3935984],[-66.1739116,-17.3937198],[-66.1743585,-17.3937004],[-66.1744538,-17.3936962],[-66.1763118,-17.3936155],[-66.1764032,-17.3936115],[-66.1764525,-17.3936094],[-66.1765758,-17.393604],[-66.1768017,-17.3935944],[-66.1775114,-17.3935644],[-66.1785862,-17.3935123],[-66.1799782,-17.3934515],[-66.1809524,-17.3934044],[-66.1822294,-17.393354],[-66.1827965,-17.3933316],[-66.1841002,-17.3932783],[-66.1844521,-17.3932597],[-66.1864116,-17.3931714],[-66.1866393,-17.3931593],[-66.1874124,-17.3931268],[-66.1874063,-17.3930168],[-66.1874037,-17.3929706],[-66.1874083,-17.3929227],[-66.1871755,-17.3923],[-66.1867127,-17.3909958],[-66.1874158,-17.3909066],[-66.1881415,-17.3908284],[-66.1888642,-17.3907311],[-66.1895951,-17.3906459],[-66.1902747,-17.3905938],[-66.1913023,-17.3906006],[-66.1911972,-17.3903302],[-66.1909663,-17.3898887],[-66.1908612,-17.389705],[-66.1924291,-17.3896632],[-66.1936644,-17.3896028],[-66.1936277,-17.389478],[-66.1941707,-17.389462],[-66.1949335,-17.3894636],[-66.1954072,-17.3894626],[-66.1953648,-17.3891758],[-66.1953245,-17.3889029],[-66.1953164,-17.3888483],[-66.1952412,-17.3883397],[-66.195184,-17.3879525],[-66.1950987,-17.3874024],[-66.1950256,-17.3868764],[-66.1949018,-17.3868763],[-66.1948894,-17.3867481],[-66.1954314,-17.386737],[-66.1955665,-17.3867536],[-66.1958005,-17.3868052],[-66.1962846,-17.3869329],[-66.19636,-17.3869412],[-66.1964499,-17.3869436],[-66.1965395,-17.3869387],[-66.1965994,-17.3869257],[-66.1970563,-17.3867864],[-66.197282,-17.3867153],[-66.1979249,-17.3864186],[-66.1985779,-17.3861014],[-66.1989148,-17.3859395],[-66.1990255,-17.3858766],[-66.1990775,-17.3858489],[-66.1990838,-17.3858308],[-66.1990948,-17.3858149],[-66.1991097,-17.3858022],[-66.1991268,-17.3857921],[-66.1991458,-17.3857859],[-66.1991657,-17.3857837],[-66.1991857,-17.3857854],[-66.1992049,-17.385791],[-66.1992165,-17.3857967],[-66.1992308,-17.3858066],[-66.1992429,-17.3858189],[-66.1992524,-17.3858331],[-66.1992591,-17.3858487],[-66.1992627,-17.3858652],[-66.199263,-17.385882],[-66.1992601,-17.3858987],[-66.1992541,-17.3859145],[-66.1992423,-17.3859326],[-66.199235,-17.3859989],[-66.1992257,-17.3860888],[-66.1992408,-17.3867732],[-66.1992394,-17.3869605],[-66.1993383,-17.3880789],[-66.2000166,-17.3880326],[-66.2006749,-17.3879771],[-66.200743,-17.3893217],[-66.201419,-17.3892899],[-66.2019802,-17.3892589],[-66.202069,-17.3892546],[-66.2020667,-17.3892001],[-66.2020323,-17.3886037],[-66.2024042,-17.3885845],[-66.203066,-17.3885504],[-66.2030394,-17.3882484],[-66.2029565,-17.3869718],[-66.2029167,-17.3864933],[-66.2028379,-17.3855672],[-66.2027512,-17.3846751],[-66.2025001,-17.3847303],[-66.2023771,-17.3847764],[-66.2018807,-17.3850082],[-66.2018085,-17.3850419],[-66.2017516,-17.3850645],[-66.2015185,-17.3851572],[-66.2004342,-17.3855202],[-66.2002485,-17.3855814],[-66.2002259,-17.3854764],[-66.2001888,-17.3847972],[-66.2001699,-17.3843237],[-66.2001449,-17.3838141],[-66.2000739,-17.3825164],[-66.2000475,-17.3818615],[-66.2000246,-17.381278]],"osmUrl":"https://www.openstreetmap.org/relation/10720900","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"vuelta","directionId":1},{"osmId":10720842,"ref":"133","name":"MiniBus 133: Calle José F. Guevara → Avenida Sexta","from":"Calle José F. Guevara","to":"Avenida Sexta","description":"","tripHeadsign":"Avenida Sexta","routeType":"bus","gtfsRouteId":106,"routeColor":"888888","stopCount":129,"stops":[{"id":7435641389,"name":"Calle Juan Manuel Zafra","lat":-17.3672047,"lon":-66.1223107},{"id":2319257655,"name":"Calle Juan Manuel Zafra","lat":-17.3682659,"lon":-66.1226566},{"id":3292825366,"name":"Calle Papa León XIII","lat":-17.3690686,"lon":-66.1229373},{"id":8436201427,"name":"Calle Papa León XIII","lat":-17.3693301,"lon":-66.1232847},{"id":11140372093,"name":"Calle José Curtinas","lat":-17.369723,"lon":-66.1236264},{"id":8436201477,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3702088,"lon":-66.1236524},{"id":8436201476,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3702143,"lon":-66.1238569},{"id":11595758318,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3702889,"lon":-66.1259229},{"id":11595759702,"name":"Avenida General Bernardino Bilbao Rioja","lat":-17.3703363,"lon":-66.1276829},{"id":1008238361,"name":"Calle Rene Fernández B.","lat":-17.3718921,"lon":-66.1276795},{"id":11071563641,"name":"Avenida Circunvalación y Avenida 6 de Junio","lat":-17.3734559,"lon":-66.1288718},{"id":601870928,"name":"Avenida Circunvalación y Calle 6 de Junio","lat":-17.3734272,"lon":-66.1289804},{"id":3287949025,"name":"Avenida Circunvalación","lat":-17.3731739,"lon":-66.129686},{"id":1044379829,"name":"Avenida Circunvalación","lat":-17.3729845,"lon":-66.1310179},{"id":4172517089,"name":"Avenida Circunvalación","lat":-17.3723128,"lon":-66.1331659},{"id":807968574,"name":"Avenida Circunvalación","lat":-17.3724718,"lon":-66.1341739},{"id":1171505048,"name":"Avenida Circunvalación","lat":-17.372736,"lon":-66.1355236},{"id":11073662405,"name":"Avenida Circunvalación","lat":-17.3727406,"lon":-66.1361302},{"id":2394199562,"name":"Avenida Circunvalación","lat":-17.3726376,"lon":-66.1367319},{"id":5605166004,"name":"Avenida Uyuni","lat":-17.3730029,"lon":-66.1369073},{"id":11987099447,"name":"Avenida América","lat":-17.3739669,"lon":-66.1370259},{"id":8509264286,"name":"Avenida América","lat":-17.3739923,"lon":-66.1379938},{"id":9973573068,"name":"Avenida América","lat":-17.3738792,"lon":-66.1397715},{"id":1785473214,"name":"Avenida América","lat":-17.3736651,"lon":-66.1424961},{"id":1785473234,"name":"Plaza Tarija","lat":-17.3734461,"lon":-66.1427978},{"id":1785473612,"name":"Plaza Tarija","lat":-17.3735363,"lon":-66.1432095},{"id":1785473511,"name":"Plaza Tarija","lat":-17.3739292,"lon":-66.1432451},{"id":2590032472,"name":"Avenida General Galindo León","lat":-17.3748707,"lon":-66.1428264},{"id":8373677218,"name":"Avenida General Galindo León","lat":-17.3762351,"lon":-66.142619},{"id":1637609914,"name":"Avenida General Galindo León","lat":-17.3769365,"lon":-66.1425292},{"id":1795293270,"name":"Avenida General Galindo León y Rotonda Cámara de Comercio","lat":-17.377476,"lon":-66.1424219},{"id":1795293377,"name":"Rotonda Cámara de Comercio","lat":-17.3776704,"lon":-66.1424359},{"id":1795293299,"name":"Innominada","lat":-17.378833,"lon":-66.1424117},{"id":8379904343,"name":"Avenida Aniceto Arce","lat":-17.379109,"lon":-66.1430678},{"id":2391341667,"name":"Avenida Aniceto Arce","lat":-17.3793728,"lon":-66.1430676},{"id":8388301598,"name":"Avenida Aniceto Arce","lat":-17.3809972,"lon":-66.1441407},{"id":312425660,"name":"Avenida Aniceto Arce y Calle Eufronio Viscarra y Calle Juan de la Cruz Torrez y Calle Samuel de Ugarte","lat":-17.3824805,"lon":-66.1451665},{"id":312425828,"name":"Avenida Aniceto Arce y Calle Doctor Germán Urquidi","lat":-17.3859308,"lon":-66.1475139},{"id":9031318856,"name":"Avenida Aniceto Arce","lat":-17.3872198,"lon":-66.1484094},{"id":312425956,"name":"Avenida Aniceto Arce y Calle Luis Pasteur","lat":-17.3885389,"lon":-66.1493366},{"id":315096054,"name":"Avenida Aniceto Arce y Calle Luis Pasteur","lat":-17.3886449,"lon":-66.1493179},{"id":2524491857,"name":"Calle Luis Pasteur","lat":-17.390703,"lon":-66.148919},{"id":2524491871,"name":"Calle Luis Pasteur","lat":-17.3917663,"lon":-66.1487038},{"id":9602314660,"name":"Calle Simon Bolívar","lat":-17.3919344,"lon":-66.14925},{"id":8515866936,"name":"Calle Simón Bolívar","lat":-17.3921352,"lon":-66.1504108},{"id":310256285,"name":"Calle Simon Bolívar y Calle Mariano Antezana","lat":-17.3924306,"lon":-66.152094},{"id":8964738193,"name":"Calle Simon Bolívar","lat":-17.392816,"lon":-66.1542733},{"id":8964738182,"name":"Calle Simon Bolívar","lat":-17.3928826,"lon":-66.154655},{"id":9884051885,"name":"Calle 25 de Mayo","lat":-17.3935814,"lon":-66.1552725},{"id":4933190239,"name":"Calle 25 de Mayo","lat":-17.3945552,"lon":-66.1551015},{"id":2681342488,"name":"Calle 25 de Mayo","lat":-17.3950347,"lon":-66.155014},{"id":3719465042,"name":"Calle 25 de Mayo","lat":-17.3960527,"lon":-66.1548104},{"id":310500794,"name":"Calle Ladislao Cabrera y Calle Esteban Arze","lat":-17.3973663,"lon":-66.1556929},{"id":310500795,"name":"Calle Ladislao Cabrera y Calle Nataniel Aguirre","lat":-17.3975624,"lon":-66.15678},{"id":310501000,"name":"Calle Uruguay y Calle Nataniel Aguirre","lat":-17.3986551,"lon":-66.1565799},{"id":1727306401,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3994887,"lon":-66.1564374},{"id":310502881,"name":"Avenida Aroma y Calle Nataniel Aguirre","lat":-17.3995781,"lon":-66.1564225},{"id":310502882,"name":"Calle Nataniel Aguirre y Calle Ismael Montes","lat":-17.4007931,"lon":-66.1561989},{"id":2933770663,"name":"Calle Nataniel Aguirre","lat":-17.4013136,"lon":-66.1561157},{"id":323982551,"name":"Calle Punata y Calle Agustín López","lat":-17.4022092,"lon":-66.1566669},{"id":310262503,"name":"Calle Punata y Avenida Ayacucho","lat":-17.4022321,"lon":-66.157327},{"id":9652874536,"name":"Avenida Ayacucho","lat":-17.4015643,"lon":-66.1574144},{"id":310262504,"name":"Calle Ismael Montes y Avenida Ayacucho","lat":-17.4009863,"lon":-66.1574786},{"id":9593572483,"name":"Avenida Ayacucho","lat":-17.4009417,"lon":-66.1574843},{"id":315111095,"name":"Avenida Aroma y Avenida Ayacucho","lat":-17.3994821,"lon":-66.1576362},{"id":1727306403,"name":"Avenida Ayacucho y Avenida Aroma","lat":-17.3993655,"lon":-66.1576356},{"id":310262706,"name":"Avenida Ayacucho y Calle Ladislao Cabrera","lat":-17.3977786,"lon":-66.1578813},{"id":2398944603,"name":"Avenida Ayacucho","lat":-17.3966561,"lon":-66.1580448},{"id":9567239716,"name":"Avenida Ayacucho","lat":-17.3946561,"lon":-66.1583705},{"id":310262961,"name":"Avenida Ayacucho","lat":-17.3935676,"lon":-66.1585844},{"id":308297344,"name":"Avenida Heroínas de la Coronilla y Avenida Ayacucho","lat":-17.3925424,"lon":-66.1587863},{"id":2295541569,"name":"Calle Republica de Colombia","lat":-17.3914514,"lon":-66.1589684},{"id":2295541594,"name":"Avenida Heroínas de la Coronilla","lat":-17.3923713,"lon":-66.1577984},{"id":648546083,"name":"Avenida Heroínas de la Coronilla y Avenida Ayacucho","lat":-17.3925589,"lon":-66.158879},{"id":2694171663,"name":"Avenida Heroínas de la Coronilla","lat":-17.3927397,"lon":-66.1599716},{"id":9155792279,"name":"Avenida Heroínas de la Coronilla","lat":-17.3929877,"lon":-66.1613786},{"id":10879431901,"name":"Avenida Heroínas de la Coronilla","lat":-17.3931236,"lon":-66.1621604},{"id":308297349,"name":"Avenida Heroínas de la Coronilla","lat":-17.3936022,"lon":-66.1649209},{"id":315936458,"name":"Avenida Heroínas de la Coronilla","lat":-17.3938288,"lon":-66.1664389},{"id":11079352070,"name":"Puente 14 de Enero y Avenida Carlos Blanco Galindo","lat":-17.3939756,"lon":-66.1673519},{"id":9081829378,"name":"Avenida Carlos Blanco Galindo","lat":-17.3939161,"lon":-66.1677971},{"id":2420519599,"name":"Avenida Carlos Blanco Galindo","lat":-17.3938779,"lon":-66.1680638},{"id":12678181847,"name":"Avenida Carlos Blanco Galindo","lat":-17.3938462,"lon":-66.1687744},{"id":13416534074,"name":"Avenida Carlos Blanco Galindo","lat":-17.3937428,"lon":-66.170464},{"id":13416534057,"name":"Rotonda Carlos Blanco Galindo y Perú","lat":-17.3937223,"lon":-66.1706515},{"id":13416534075,"name":"Avenida Carlos Blanco Galindo","lat":-17.3937167,"lon":-66.170806},{"id":563279519,"name":"Avenida Carlos Blanco Galindo","lat":-17.3936297,"lon":-66.1723743},{"id":2527263184,"name":"Calle Francisco Pizarro y Avenida Carlos Blanco Galindo","lat":-17.3937198,"lon":-66.1739116},{"id":13438065396,"name":"Avenida Carlos Blanco Galindo","lat":-17.3936115,"lon":-66.1764032},{"id":2354386743,"name":"Avenida Carlos Blanco Galindo y Avenida Blanco Galindo y Calle San Lorenzo","lat":-17.3935644,"lon":-66.1775114},{"id":13847108974,"name":"Avenida Carlos Blanco Galindo","lat":-17.393354,"lon":-66.1822294},{"id":13847108970,"name":"Distribudor Beijing","lat":-17.3932054,"lon":-66.1839858},{"id":5868941108,"name":"Distribudor Beijing","lat":-17.3928414,"lon":-66.1840379},{"id":4576706143,"name":"Avenida Beijing","lat":-17.3912826,"lon":-66.1835175},{"id":9010533088,"name":"Avenida Beijing","lat":-17.3887464,"lon":-66.1826146},{"id":2690718996,"name":"Avenida Beijing","lat":-17.3876854,"lon":-66.1822461},{"id":7961798483,"name":"Rotonda Beijing y d'Orbigny","lat":-17.3873899,"lon":-66.1820907},{"id":7961798473,"name":"Rotonda Beijing y d'Orbigny","lat":-17.3872022,"lon":-66.1822229},{"id":7961798471,"name":"Avenida d'Orbigny","lat":-17.3871026,"lon":-66.1827411},{"id":9000087161,"name":"Avenida d'Orbigny","lat":-17.3861123,"lon":-66.1849947},{"id":11073885190,"name":"Avenida d'Orbigny","lat":-17.3859841,"lon":-66.1852245},{"id":3265528127,"name":"Avenida d'Orbigny","lat":-17.3858952,"lon":-66.1855945},{"id":7956609164,"name":"Avenida d'Orbigny","lat":-17.3859784,"lon":-66.1860951},{"id":698491980,"name":"Avenida d'Orbigny","lat":-17.385973,"lon":-66.1869267},{"id":560522507,"name":"Avenida d'Orbigny","lat":-17.3860538,"lon":-66.1876143},{"id":2265578432,"name":"Avenida d'Orbigny","lat":-17.3860347,"lon":-66.1879181},{"id":4173546434,"name":"Avenida d'Orbigny y Avenida Thunupa","lat":-17.3858332,"lon":-66.1882463},{"id":560522649,"name":"Avenida d'Orbigny","lat":-17.3857851,"lon":-66.1883879},{"id":7956617292,"name":"Avenida d'Orbigny","lat":-17.3858025,"lon":-66.1890721},{"id":3265528126,"name":"Avenida d'Orbigny","lat":-17.3858827,"lon":-66.1900234},{"id":7957525137,"name":"Avenida d'Orbigny","lat":-17.3862978,"lon":-66.1916173},{"id":7957525168,"name":"Avenida d'Orbigny","lat":-17.3864982,"lon":-66.1924345},{"id":3265528153,"name":"Avenida d'Orbigny","lat":-17.38675,"lon":-66.1934595},{"id":3265969664,"name":"Avenida d'Orbigny","lat":-17.3867599,"lon":-66.1944913},{"id":560522421,"name":"Avenida d'Orbigny","lat":-17.3869329,"lon":-66.1962846},{"id":3265528364,"name":"Avenida d'Orbigny","lat":-17.3869257,"lon":-66.1965994},{"id":560522391,"name":"Avenida d'Orbigny","lat":-17.3861014,"lon":-66.1985779},{"id":11071425290,"name":"Rotonda d'Orbigny y Juan Pablo II","lat":-17.3858308,"lon":-66.1990838},{"id":2357127467,"name":"Rotonda d'Orbigny y Juan Pablo II","lat":-17.3857859,"lon":-66.1991458},{"id":3263807764,"name":"Rotonda d'Orbigny y Juan Pablo II y Avenida d'Orbigny","lat":-17.3857967,"lon":-66.1992165},{"id":6558458732,"name":"Avenida d'Orbigny","lat":-17.3855639,"lon":-66.1999461},{"id":10875062209,"name":"Avenida d'Orbigny","lat":-17.384912,"lon":-66.2018313},{"id":3259852031,"name":"Avenida d'Orbigny","lat":-17.3845174,"lon":-66.2029286},{"id":5371387024,"name":"Avenida d'Orbigny","lat":-17.3844527,"lon":-66.2044376},{"id":560437411,"name":"Avenida d'Orbigny y Calle Cardenal Richard James Cushing","lat":-17.3844499,"lon":-66.2059582},{"id":560437413,"name":"Calle Cardenal Richard James Cushing y Calle Monseñor Juan Tarsicio Senner","lat":-17.3832597,"lon":-66.2066875},{"id":560437425,"name":"Calle Cardenal Richard James Cushing y Avenida Tadeo Haenke","lat":-17.383058,"lon":-66.2068535},{"id":11071479569,"name":"Calle Cardenal Richard James Cushing","lat":-17.38188,"lon":-66.2077891},{"id":794098688,"name":"Calle Isaac Aranibar","lat":-17.3817742,"lon":-66.2080715}],"coordinates":[[-66.1223107,-17.3672047],[-66.1224821,-17.3677072],[-66.1225069,-17.3677866],[-66.1226239,-17.3681611],[-66.1226566,-17.3682659],[-66.1226797,-17.3683319],[-66.1227158,-17.3688808],[-66.1227781,-17.3689487],[-66.1229373,-17.3690686],[-66.1230447,-17.3691434],[-66.1232154,-17.3692801],[-66.1232558,-17.3693051],[-66.1232847,-17.3693301],[-66.1236165,-17.3695719],[-66.123681,-17.3696178],[-66.1236261,-17.3696916],[-66.1236264,-17.369723],[-66.1236085,-17.3701294],[-66.1236069,-17.3701651],[-66.123606,-17.3702076],[-66.1236524,-17.3702088],[-66.1236821,-17.3702096],[-66.1237094,-17.3702104],[-66.1238569,-17.3702143],[-66.1242186,-17.3702248],[-66.1252487,-17.370247],[-66.1257595,-17.3702829],[-66.1259229,-17.3702889],[-66.1263394,-17.370304],[-66.1265643,-17.3703112],[-66.1266596,-17.3703142],[-66.1276829,-17.3703363],[-66.1277529,-17.3703392],[-66.1277502,-17.3704123],[-66.1277233,-17.371135],[-66.1276795,-17.3718921],[-66.1276511,-17.3726604],[-66.1276215,-17.3734599],[-66.1286377,-17.3734742],[-66.1287806,-17.373469],[-66.1288718,-17.3734559],[-66.1289804,-17.3734272],[-66.1290673,-17.3733898],[-66.1291753,-17.3733341],[-66.1293134,-17.3732714],[-66.1294557,-17.3732223],[-66.1295565,-17.3732012],[-66.129686,-17.3731739],[-66.1298501,-17.3731449],[-66.1303179,-17.3731127],[-66.1306023,-17.3730894],[-66.1307793,-17.373061],[-66.1309291,-17.3730212],[-66.1310179,-17.3729845],[-66.1314812,-17.3727838],[-66.1316193,-17.3727343],[-66.1318136,-17.3726612],[-66.1319085,-17.372646],[-66.1329231,-17.3723571],[-66.1330304,-17.37233],[-66.1331659,-17.3723128],[-66.1332925,-17.3723089],[-66.1333772,-17.3723184],[-66.1335092,-17.3723479],[-66.1336915,-17.3723819],[-66.1341207,-17.3724619],[-66.1341739,-17.3724718],[-66.1342413,-17.3724859],[-66.1347484,-17.3725916],[-66.1350955,-17.3726555],[-66.1351615,-17.3726676],[-66.1352161,-17.3726819],[-66.1355236,-17.372736],[-66.1356936,-17.3727606],[-66.1358009,-17.3727624],[-66.1358677,-17.3727603],[-66.1359713,-17.372756],[-66.1360713,-17.3727463],[-66.1361302,-17.3727406],[-66.1362225,-17.3727317],[-66.1364442,-17.3727058],[-66.1365705,-17.3726845],[-66.1366185,-17.3726721],[-66.1366865,-17.3726538],[-66.1367319,-17.3726376],[-66.1367986,-17.3727325],[-66.1368269,-17.3727815],[-66.1368693,-17.3728583],[-66.1368948,-17.3729174],[-66.136906,-17.3729586],[-66.1369073,-17.3730029],[-66.136881,-17.3732055],[-66.13684,-17.3734719],[-66.1368439,-17.3735544],[-66.1368742,-17.373674],[-66.1369629,-17.3739679],[-66.136975,-17.3739775],[-66.1370259,-17.3739669],[-66.1370767,-17.3739665],[-66.1371628,-17.3739898],[-66.1372619,-17.3740157],[-66.1373665,-17.3740291],[-66.1377544,-17.3740075],[-66.1379938,-17.3739923],[-66.138031,-17.3739897],[-66.1380655,-17.3739873],[-66.1387982,-17.3739417],[-66.1388403,-17.3739389],[-66.1396726,-17.3738852],[-66.1397715,-17.3738792],[-66.1405964,-17.3738295],[-66.1416003,-17.373772],[-66.1422624,-17.3737346],[-66.1423298,-17.3737222],[-66.1424276,-17.3736928],[-66.1424961,-17.3736651],[-66.1426187,-17.3736122],[-66.142654,-17.3735557],[-66.1426742,-17.3735322],[-66.1427001,-17.3735067],[-66.1427463,-17.3734725],[-66.1427978,-17.3734461],[-66.1428532,-17.373428],[-66.1429065,-17.3734193],[-66.1429606,-17.3734184],[-66.1430141,-17.3734253],[-66.143066,-17.3734399],[-66.1431441,-17.3734795],[-66.1432095,-17.3735363],[-66.1432581,-17.3736067],[-66.1432811,-17.3736636],[-66.143293,-17.3737236],[-66.1432935,-17.3737846],[-66.1432825,-17.3738447],[-66.1432451,-17.3739292],[-66.1431855,-17.3740009],[-66.1431078,-17.3740548],[-66.1430179,-17.3740869],[-66.1429705,-17.3741295],[-66.1429314,-17.3741958],[-66.1428264,-17.3748707],[-66.1428132,-17.3749632],[-66.1428008,-17.3750357],[-66.1427526,-17.3753405],[-66.1426839,-17.3757746],[-66.1426736,-17.3758395],[-66.142619,-17.3762351],[-66.142601,-17.3763647],[-66.1425808,-17.3764786],[-66.1425494,-17.3767783],[-66.1425426,-17.3768431],[-66.1425381,-17.3768848],[-66.1425292,-17.3769365],[-66.1425277,-17.3769451],[-66.1425249,-17.3769601],[-66.1424276,-17.3773273],[-66.1424039,-17.3774192],[-66.1424088,-17.3774411],[-66.1424219,-17.377476],[-66.1424376,-17.3774945],[-66.1424518,-17.3775229],[-66.1424601,-17.3775508],[-66.1424632,-17.3775797],[-66.142461,-17.3776086],[-66.1424521,-17.3776461],[-66.1424359,-17.3776704],[-66.1424598,-17.3777399],[-66.1424536,-17.3778549],[-66.1424014,-17.3784476],[-66.1423772,-17.3787495],[-66.1423857,-17.3787904],[-66.1424117,-17.378833],[-66.1424539,-17.3788802],[-66.1425271,-17.3789172],[-66.1427305,-17.3789834],[-66.1429971,-17.3790674],[-66.1430493,-17.3790829],[-66.1430678,-17.379109],[-66.1430837,-17.3791368],[-66.1430966,-17.3791658],[-66.1431016,-17.3791891],[-66.1431024,-17.3792129],[-66.1430994,-17.3792366],[-66.1430676,-17.3793728],[-66.1430688,-17.3794137],[-66.1430776,-17.379442],[-66.1430937,-17.379472],[-66.1432028,-17.3796329],[-66.1441031,-17.3809425],[-66.1441407,-17.3809972],[-66.1442263,-17.3811247],[-66.1443213,-17.3812621],[-66.1443343,-17.3812809],[-66.1443962,-17.3813704],[-66.1450554,-17.3823239],[-66.1451665,-17.3824805],[-66.145265,-17.3826252],[-66.1462641,-17.3840939],[-66.1462906,-17.3841328],[-66.1463324,-17.3841942],[-66.1463585,-17.3842326],[-66.147463,-17.385856],[-66.1475139,-17.3859308],[-66.1475669,-17.3860074],[-66.147678,-17.3861681],[-66.1477159,-17.3862228],[-66.148064,-17.3867233],[-66.1483646,-17.3871554],[-66.1484094,-17.3872198],[-66.1485012,-17.3873491],[-66.1485192,-17.3873745],[-66.1486427,-17.3875508],[-66.1488419,-17.3878325],[-66.14901,-17.38807],[-66.1491698,-17.3882995],[-66.1493366,-17.3885389],[-66.1493179,-17.3886449],[-66.1492,-17.3892545],[-66.1491441,-17.3895439],[-66.1490107,-17.3902306],[-66.148919,-17.390703],[-66.1489091,-17.3907458],[-66.1488943,-17.3908244],[-66.1488864,-17.3908667],[-66.1487038,-17.3917663],[-66.1486906,-17.3918339],[-66.1491355,-17.3919138],[-66.14925,-17.3919344],[-66.1495076,-17.3919807],[-66.1497628,-17.3920265],[-66.1498197,-17.392033],[-66.1504108,-17.3921352],[-66.150973,-17.3922345],[-66.151028,-17.3922446],[-66.1510804,-17.3922537],[-66.152094,-17.3924306],[-66.1524841,-17.3924988],[-66.1531979,-17.3926236],[-66.1538914,-17.3927509],[-66.1542733,-17.392816],[-66.1543214,-17.3928243],[-66.154388,-17.3928359],[-66.154655,-17.3928826],[-66.1553359,-17.3930017],[-66.155383,-17.3930104],[-66.1553734,-17.3930447],[-66.1552725,-17.3935814],[-66.1551933,-17.3940026],[-66.1551851,-17.3940462],[-66.1551904,-17.3941103],[-66.1551015,-17.3945552],[-66.155099,-17.3945689],[-66.155095,-17.394591],[-66.1550466,-17.3948561],[-66.155014,-17.3950347],[-66.1550064,-17.3950677],[-66.1548371,-17.3959195],[-66.1548104,-17.3960527],[-66.1547941,-17.3961338],[-66.1546703,-17.3967578],[-66.1545798,-17.3971915],[-66.1546495,-17.397201],[-66.1556929,-17.3973663],[-66.15678,-17.3975624],[-66.1565799,-17.3986551],[-66.1564374,-17.3994887],[-66.1564225,-17.3995781],[-66.1561989,-17.4007931],[-66.1561157,-17.4013136],[-66.1559482,-17.4021963],[-66.1566669,-17.4022092],[-66.157327,-17.4022321],[-66.1573377,-17.4021346],[-66.1574144,-17.4015643],[-66.1574614,-17.4011383],[-66.1574786,-17.4009863],[-66.1574843,-17.4009417],[-66.1576275,-17.3996977],[-66.1576328,-17.3995669],[-66.1576362,-17.3994821],[-66.1576356,-17.3993655],[-66.157638,-17.3993118],[-66.1576443,-17.3992052],[-66.1576879,-17.3989051],[-66.1578716,-17.3978437],[-66.1578813,-17.3977786],[-66.1578893,-17.39773],[-66.1580315,-17.3967547],[-66.1580388,-17.3967006],[-66.1580448,-17.3966561],[-66.1581681,-17.3958044],[-66.1581878,-17.3956991],[-66.1581946,-17.3956551],[-66.1582007,-17.3956153],[-66.1583705,-17.3946561],[-66.1583789,-17.3946085],[-66.1583955,-17.3945259],[-66.1585778,-17.3936167],[-66.1585844,-17.3935676],[-66.1585979,-17.3934997],[-66.1587386,-17.3927896],[-66.1587574,-17.3926949],[-66.1587699,-17.3926319],[-66.1587863,-17.3925424],[-66.1587963,-17.3924909],[-66.1590109,-17.3915018],[-66.1590212,-17.3914589],[-66.1589684,-17.3914514],[-66.1585353,-17.3913854],[-66.1579619,-17.3912877],[-66.1577628,-17.3923128],[-66.157753,-17.3923634],[-66.1577984,-17.3923713],[-66.1579623,-17.3923997],[-66.1585898,-17.3925084],[-66.158634,-17.3925161],[-66.1587059,-17.3925285],[-66.1587863,-17.3925424],[-66.158879,-17.3925589],[-66.1589397,-17.3925698],[-66.1598762,-17.3927236],[-66.1599202,-17.3927307],[-66.1599716,-17.3927397],[-66.1610041,-17.3929135],[-66.1610608,-17.3929264],[-66.1611287,-17.392944],[-66.1613786,-17.3929877],[-66.1615323,-17.3930145],[-66.1619926,-17.393095],[-66.1620628,-17.3931073],[-66.1621604,-17.3931236],[-66.1627999,-17.3932302],[-66.1638761,-17.3934096],[-66.1639278,-17.3934182],[-66.1639915,-17.39343],[-66.1649209,-17.3936022],[-66.1659169,-17.3937793],[-66.1661485,-17.39382],[-66.1661971,-17.3938251],[-66.1664389,-17.3938288],[-66.1666104,-17.3938412],[-66.1667802,-17.3938867],[-66.1669374,-17.3939373],[-66.1673519,-17.3939756],[-66.1673761,-17.3939742],[-66.167449,-17.3939739],[-66.1675661,-17.3939554],[-66.1677971,-17.3939161],[-66.1678276,-17.3939109],[-66.16786,-17.3939053],[-66.167994,-17.3938847],[-66.1680638,-17.3938779],[-66.1683952,-17.3938639],[-66.1686034,-17.3938542],[-66.1686861,-17.3938503],[-66.1687744,-17.3938462],[-66.169044,-17.3938336],[-66.169397,-17.3937798],[-66.1702232,-17.3937475],[-66.170464,-17.3937428],[-66.1705344,-17.3937414],[-66.1705703,-17.3937406],[-66.1706025,-17.3937291],[-66.1706268,-17.3937242],[-66.1706515,-17.3937223],[-66.1706764,-17.3937233],[-66.1707008,-17.3937272],[-66.1707334,-17.3937374],[-66.170806,-17.3937167],[-66.170822,-17.3937126],[-66.170857,-17.3937045],[-66.1709593,-17.3936894],[-66.1723743,-17.3936297],[-66.1724077,-17.3936281],[-66.173901,-17.3935555],[-66.1739037,-17.3935984],[-66.1739116,-17.3937198],[-66.1743585,-17.3937004],[-66.1744538,-17.3936962],[-66.1763118,-17.3936155],[-66.1764032,-17.3936115],[-66.1764525,-17.3936094],[-66.1765758,-17.393604],[-66.1768017,-17.3935944],[-66.1775114,-17.3935644],[-66.1785862,-17.3935123],[-66.1799782,-17.3934515],[-66.1809524,-17.3934044],[-66.1822294,-17.393354],[-66.1827965,-17.3933316],[-66.1830988,-17.3932421],[-66.1837505,-17.3932154],[-66.1839858,-17.3932054],[-66.1840473,-17.3932027],[-66.1840752,-17.3931628],[-66.1840992,-17.3931383],[-66.1841264,-17.3931171],[-66.1840379,-17.3928414],[-66.1837994,-17.3922431],[-66.1837583,-17.3921427],[-66.1835301,-17.3914079],[-66.1835175,-17.3912826],[-66.1832807,-17.3906476],[-66.1831059,-17.3901788],[-66.1829271,-17.3896705],[-66.1826146,-17.3887464],[-66.1824225,-17.3881715],[-66.1822924,-17.3877822],[-66.1822657,-17.3877264],[-66.1822461,-17.3876854],[-66.1822045,-17.3876134],[-66.1821689,-17.3875445],[-66.1821075,-17.3874342],[-66.1820907,-17.3873899],[-66.1820896,-17.3873527],[-66.1821066,-17.3872758],[-66.1821595,-17.3872337],[-66.1822229,-17.3872022],[-66.1824097,-17.3871674],[-66.1824681,-17.3871556],[-66.1826353,-17.3871253],[-66.1827411,-17.3871026],[-66.183101,-17.3869483],[-66.1841115,-17.3865125],[-66.1842669,-17.3864455],[-66.1848852,-17.3861711],[-66.1849947,-17.3861123],[-66.185032,-17.3860923],[-66.1850844,-17.3860623],[-66.1851734,-17.3860121],[-66.1852245,-17.3859841],[-66.1852973,-17.3859491],[-66.1854424,-17.3859041],[-66.1855054,-17.3858969],[-66.1855945,-17.3858952],[-66.1856957,-17.3859059],[-66.1859113,-17.3859499],[-66.1859794,-17.3859592],[-66.1860951,-17.3859784],[-66.186154,-17.3859828],[-66.1865671,-17.3859584],[-66.1867448,-17.3859556],[-66.1869267,-17.385973],[-66.1873128,-17.3860187],[-66.1874584,-17.3860342],[-66.1875185,-17.3860419],[-66.1876143,-17.3860538],[-66.1876861,-17.3860589],[-66.1877579,-17.386064],[-66.1878383,-17.3860623],[-66.1879181,-17.3860347],[-66.188006,-17.3859829],[-66.1880591,-17.3859488],[-66.1880892,-17.3859294],[-66.1881509,-17.3858896],[-66.1882463,-17.3858332],[-66.1882812,-17.3858183],[-66.1883136,-17.3858061],[-66.1883348,-17.3858001],[-66.1883879,-17.3857851],[-66.1884967,-17.3857746],[-66.1886544,-17.385773],[-66.1889926,-17.3857969],[-66.1890721,-17.3858025],[-66.1891143,-17.3858055],[-66.1892797,-17.3858172],[-66.1899074,-17.3858617],[-66.1900234,-17.3858827],[-66.190315,-17.3859551],[-66.1906866,-17.3860516],[-66.1907972,-17.3860803],[-66.1916173,-17.3862978],[-66.192068,-17.3864059],[-66.1921864,-17.3864357],[-66.1923716,-17.3864811],[-66.1924345,-17.3864982],[-66.1932239,-17.3867033],[-66.1932681,-17.3867129],[-66.1933945,-17.3867375],[-66.1934595,-17.38675],[-66.193626,-17.3867687],[-66.1939251,-17.3867669],[-66.194025,-17.3867662],[-66.1944913,-17.3867599],[-66.1948894,-17.3867481],[-66.1954314,-17.386737],[-66.1955665,-17.3867536],[-66.1958005,-17.3868052],[-66.1962846,-17.3869329],[-66.19636,-17.3869412],[-66.1964499,-17.3869436],[-66.1965395,-17.3869387],[-66.1965994,-17.3869257],[-66.1970563,-17.3867864],[-66.197282,-17.3867153],[-66.1979249,-17.3864186],[-66.1985779,-17.3861014],[-66.1989148,-17.3859395],[-66.1990255,-17.3858766],[-66.1990775,-17.3858489],[-66.1990838,-17.3858308],[-66.1990948,-17.3858149],[-66.1991097,-17.3858022],[-66.1991268,-17.3857921],[-66.1991458,-17.3857859],[-66.1991657,-17.3857837],[-66.1991857,-17.3857854],[-66.1992049,-17.385791],[-66.1992165,-17.3857967],[-66.199281,-17.385776],[-66.1993642,-17.3857565],[-66.1994926,-17.3857164],[-66.1999461,-17.3855639],[-66.2002259,-17.3854764],[-66.2014896,-17.3850607],[-66.2017105,-17.3849651],[-66.2017654,-17.3849413],[-66.2018313,-17.384912],[-66.2023188,-17.3846951],[-66.2024982,-17.3846274],[-66.2027588,-17.3845629],[-66.2029286,-17.3845174],[-66.2030924,-17.3844982],[-66.2036077,-17.384478],[-66.2040031,-17.3844664],[-66.2044376,-17.3844527],[-66.2045052,-17.3844522],[-66.2045749,-17.3844518],[-66.2052916,-17.3844274],[-66.2058433,-17.3844497],[-66.2059582,-17.3844499],[-66.2066875,-17.3832597],[-66.2067507,-17.3831945],[-66.2068535,-17.383058],[-66.2070718,-17.3827278],[-66.2077891,-17.38188],[-66.2078009,-17.3818422],[-66.2077974,-17.3818128],[-66.2080715,-17.3817742]],"osmUrl":"https://www.openstreetmap.org/relation/10720842","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"vuelta","directionId":0}]}]}</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+(function () {
+  const REPORT = JSON.parse(document.getElementById('report-data').textContent);
+  const STORAGE_KEY = 'trufi-validation-' + REPORT.slug;
+  const VIS_KEY = 'trufi-vis-' + REPORT.slug;
+
+  const HIGHLIGHT_COLOR = '#f59e0b';
+  const DIM_COLOR = '#94a3b8';
+  const STOP_RADIUS = 2;
+  const STOP_RADIUS_SELECTED = 4;
+
+  function loadValidation() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveValidation(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    updateProgress();
+  }
+  function loadVisibility() {
+    try { return JSON.parse(localStorage.getItem(VIS_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveVisibility(data) {
+    localStorage.setItem(VIS_KEY, JSON.stringify(data));
+  }
+
+  const validation = loadValidation();
+  const visibility = loadVisibility();
+  let selectedOsmId = null;
+
+  const overviewMap = L.map('overview-map', { scrollWheelZoom: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(overviewMap);
+  overviewMap.setView([-17.39, -66.16], 12);
+
+  const variantLayers = {};
+  const routeMaps = {};
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  }
+  function hexColor(c) { return c && String(c).length >= 3 ? '#' + String(c).replace('#','') : '#64748b'; }
+  function coordsToLatLngs(coords) {
+    return coords.map(function (c) { return [c[1], c[0]]; });
+  }
+  function dirLabelHtml(label) {
+    if (label === 'ida') return '<span class="dir-badge dir-ida">→ Ida</span>';
+    if (label === 'vuelta') return '<span class="dir-badge dir-vuelta">← Vuelta</span>';
+    return '<span class="dir-badge dir-unico">↔ Único</span>';
+  }
+  function dirLabelText(label) {
+    if (label === 'ida') return 'Ida';
+    if (label === 'vuelta') return 'Vuelta';
+    return 'Único';
+  }
+  function buildPopup(v) {
+    return dirLabelHtml(v.directionLabel) +
+      ' <strong>' + esc(v.ref) + '</strong><br>' +
+      esc(v.from) + ' → ' + esc(v.to) +
+      (v.description ? '<br><em>' + esc(v.description) + '</em>' : '') +
+      '<br><a href="' + v.osmUrl + '" target="_blank" rel="noopener">Ver en OSM</a>';
+  }
+  function addDirectionArrow(layerGroup, latlngs, color) {
+    if (latlngs.length < 2) return null;
+    var idx = Math.min(Math.floor(latlngs.length * 0.75), latlngs.length - 1);
+    var p1 = latlngs[Math.max(0, idx - 1)];
+    var p2 = latlngs[idx];
+    var angle = Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180 / Math.PI;
+    var marker = L.marker(p2, {
+      icon: L.divIcon({
+        className: 'dir-arrow-icon',
+        html: '<div style="transform:rotate(' + angle + 'deg);color:' + color + ';font-weight:bold">▶</div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      }),
+      interactive: false
+    });
+    marker.addTo(layerGroup);
+    return marker;
+  }
+
+  function styleVariant(osmId) {
+    var entry = variantLayers[osmId];
+    if (!entry || !entry.visible) return;
+    var v = entry.variant;
+    var isSelected = selectedOsmId === osmId;
+    var baseColor = hexColor(v.routeColor || entry.refColor);
+
+    if (isSelected) {
+      entry.line.setStyle({ color: HIGHLIGHT_COLOR, weight: 6, opacity: 1 });
+      if (entry.arrow) entry.arrow.setOpacity(1);
+    } else if (selectedOsmId !== null) {
+      entry.line.setStyle({ color: DIM_COLOR, weight: 3, opacity: 0.35 });
+      if (entry.arrow) entry.arrow.setOpacity(0.3);
+    } else {
+      entry.line.setStyle({ color: baseColor, weight: 4, opacity: 0.85 });
+      if (entry.arrow) entry.arrow.setOpacity(0.9);
+    }
+
+    entry.stops.clearLayers();
+    if (isSelected && v.stops && v.stops.length) {
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], {
+          radius: STOP_RADIUS_SELECTED,
+          color: HIGHLIGHT_COLOR,
+          fillColor: HIGHLIGHT_COLOR,
+          fillOpacity: 0.85,
+          weight: 1
+        }).bindPopup(esc(s.name)).addTo(entry.stops);
+      });
+    }
+  }
+
+  function refreshAllStyles() {
+    Object.keys(variantLayers).forEach(function (id) { styleVariant(Number(id)); });
+    var anyVisible = Object.values(variantLayers).some(function (e) { return e.visible; });
+    document.getElementById('map-hint').style.display = anyVisible ? 'none' : 'block';
+    var n = Object.values(variantLayers).filter(function (e) { return e.visible; }).length;
+    var status = n + ' ruta(s) visible(s)';
+    if (selectedOsmId && variantLayers[selectedOsmId]) {
+      var sv = variantLayers[selectedOsmId].variant;
+      status += ' · Seleccionada: ' + dirLabelText(sv.directionLabel) + ' ' + sv.from + ' → ' + sv.to;
+    }
+    document.getElementById('map-status').textContent = status;
+  }
+
+  function selectVariant(osmId) {
+    selectedOsmId = osmId;
+    document.querySelectorAll('.vis-variant').forEach(function (el) {
+      el.classList.toggle('selected', Number(el.dataset.osmId) === osmId);
+    });
+    refreshAllStyles();
+    var entry = variantLayers[osmId];
+    if (entry && entry.line) {
+      overviewMap.fitBounds(entry.line.getBounds(), { padding: [48, 48] });
+    }
+  }
+
+  function setVariantVisible(osmId, visible) {
+    var entry = variantLayers[osmId];
+    if (!entry) return;
+    entry.visible = visible;
+    visibility[osmId] = visible;
+    saveVisibility(visibility);
+
+    if (visible) {
+      entry.group.addTo(overviewMap);
+    } else {
+      overviewMap.removeLayer(entry.group);
+      if (selectedOsmId === osmId) selectedOsmId = null;
+    }
+    var cb = document.querySelector('.vis-variant[data-osm-id="' + osmId + '"] input');
+    if (cb) cb.checked = visible;
+    refreshAllStyles();
+  }
+
+  REPORT.refGroups.forEach(function (group) {
+    var refColor = hexColor(group.routeColor);
+
+    group.variants.forEach(function (v) {
+      if (!v.coordinates || !v.coordinates.length) return;
+
+      var latlngs = coordsToLatLngs(v.coordinates);
+      var groupLayer = L.layerGroup();
+      var stopsLayer = L.layerGroup();
+      var line = L.polyline(latlngs, { color: refColor, weight: 4, opacity: 0.85 });
+      line.bindPopup(buildPopup(v));
+      line.on('click', function (e) {
+        L.DomEvent.stopPropagation(e);
+        if (!variantLayers[v.osmId].visible) setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+      });
+      line.addTo(groupLayer);
+      var arrow = addDirectionArrow(groupLayer, latlngs, refColor);
+      stopsLayer.addTo(groupLayer);
+
+      variantLayers[v.osmId] = {
+        osmId: v.osmId,
+        ref: group.ref,
+        refColor: group.routeColor,
+        variant: v,
+        group: groupLayer,
+        line: line,
+        stops: stopsLayer,
+        arrow: arrow,
+        visible: false
+      };
+    });
+  });
+
+  var visList = document.getElementById('visibility-list');
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = document.createElement('div');
+    refBlock.className = 'vis-ref-group';
+    refBlock.dataset.ref = group.ref;
+
+    var refHead = document.createElement('div');
+    refHead.className = 'vis-ref-head';
+    var refCb = document.createElement('input');
+    refCb.type = 'checkbox';
+    refCb.title = 'Mostrar/ocultar línea ' + group.ref;
+    refHead.appendChild(refCb);
+    refHead.appendChild(document.createTextNode(' Línea ' + group.ref + ' (' + group.variants.length + ')'));
+    refBlock.appendChild(refHead);
+
+    group.variants.forEach(function (v) {
+      if (!variantLayers[v.osmId]) return;
+      var row = document.createElement('label');
+      row.className = 'vis-variant';
+      row.dataset.osmId = String(v.osmId);
+      row.dataset.search = [v.ref, v.from, v.to, v.description, v.name].join(' ').toLowerCase();
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!visibility[v.osmId];
+      if (cb.checked) setVariantVisible(v.osmId, true);
+
+      var text = document.createElement('div');
+      text.className = 'vis-variant-text';
+      text.innerHTML = dirLabelHtml(v.directionLabel) +
+        '<strong>' + esc(v.from) + ' → ' + esc(v.to) + '</strong>' +
+        (v.description ? '<br><span style="color:var(--muted)">' + esc(v.description) + '</span>' : '');
+
+      row.appendChild(cb);
+      row.appendChild(text);
+      refBlock.appendChild(row);
+
+      cb.addEventListener('change', function () {
+        setVariantVisible(v.osmId, cb.checked);
+        updateRefCheckbox(refCb, group);
+      });
+      row.addEventListener('click', function (e) {
+        if (e.target === cb) return;
+        selectVariant(v.osmId);
+        if (!cb.checked) { cb.checked = true; setVariantVisible(v.osmId, true); updateRefCheckbox(refCb, group); }
+      });
+    });
+
+    refCb.addEventListener('change', function () {
+      group.variants.forEach(function (v) {
+        if (variantLayers[v.osmId]) setVariantVisible(v.osmId, refCb.checked);
+      });
+      refBlock.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
+    });
+
+    refHead.addEventListener('click', function (e) {
+      if (e.target !== refCb) { refCb.checked = !refCb.checked; refCb.dispatchEvent(new Event('change')); }
+    });
+
+    visList.appendChild(refBlock);
+  });
+
+  function updateRefCheckbox(refCb, group) {
+    var checked = group.variants.filter(function (v) { return variantLayers[v.osmId] && variantLayers[v.osmId].visible; }).length;
+    refCb.checked = checked === group.variants.length;
+    refCb.indeterminate = checked > 0 && checked < group.variants.length;
+  }
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = visList.querySelector('[data-ref="' + group.ref.replace(/"/g, '') + '"]');
+    if (!refBlock) return;
+    var refCb = refBlock.querySelector('.vis-ref-head input');
+    updateRefCheckbox(refCb, group);
+  });
+
+  document.getElementById('vis-all').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), true); });
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = true; c.indeterminate = false; });
+  });
+  document.getElementById('vis-none').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), false); });
+    selectedOsmId = null;
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; c.indeterminate = false; });
+    refreshAllStyles();
+  });
+  document.getElementById('fit-visible').addEventListener('click', function () {
+    var bounds = L.latLngBounds([]);
+    Object.values(variantLayers).forEach(function (e) {
+      if (e.visible && e.line) e.line.getLatLngs().forEach(function (ll) {
+        if (Array.isArray(ll[0])) ll.forEach(function (p) { bounds.extend(p); });
+        else bounds.extend(ll);
+      });
+    });
+    if (bounds.isValid()) overviewMap.fitBounds(bounds, { padding: [32, 32] });
+  });
+
+  overviewMap.on('click', function () {
+    selectedOsmId = null;
+    document.querySelectorAll('.vis-variant.selected').forEach(function (el) { el.classList.remove('selected'); });
+    refreshAllStyles();
+  });
+
+  var container = document.getElementById('routes-container');
+  REPORT.refGroups.forEach(function (group) {
+    var card = document.createElement('article');
+    card.className = 'route-card';
+    card.dataset.ref = group.ref;
+
+    var header = document.createElement('div');
+    header.className = 'route-header';
+    header.innerHTML =
+      '<span class="route-badge">' + esc(group.ref) + '</span>' +
+      '<span class="route-title">' + esc(group.routeLongName || group.ref) + '</span>' +
+      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>';
+    card.appendChild(header);
+
+    var body = document.createElement('div');
+    body.className = 'route-body';
+    var grid = document.createElement('div');
+    grid.className = 'route-grid';
+
+    var mapDiv = document.createElement('div');
+    mapDiv.className = 'route-map';
+    grid.appendChild(mapDiv);
+
+    var variantsCol = document.createElement('div');
+    group.variants.forEach(function (v) {
+      var block = document.createElement('div');
+      block.className = 'variant-block';
+      block.dataset.osmId = String(v.osmId);
+      block.dataset.search = [v.ref, v.name, v.from, v.to, v.description].join(' ').toLowerCase();
+
+      var statusCls = v.status === 'ok' ? 'status-ok' : 'status-err';
+      var statusTxt = v.status === 'ok' ? '✅ OK' : '❌ ' + esc(v.errorMessage);
+
+      block.innerHTML =
+        '<h4>' + dirLabelHtml(v.directionLabel) + esc(v.from) + ' → ' + esc(v.to) + '</h4>' +
+        '<div class="variant-links">' +
+          '<a href="' + v.osmUrl + '" target="_blank" rel="noopener">OSM #' + v.osmId + '</a>' +
+          '<a href="#" class="show-on-map">Ver en mapa</a>' +
+        '</div>' +
+        '<div class="route-meta">' + esc(v.name) + '</div>' +
+        (v.description ? '<div class="route-meta">Variante: ' + esc(v.description) + '</div>' : '') +
+        '<div class="route-meta ' + statusCls + '">' + statusTxt + ' · ' + v.stopCount + ' paradas</div>' +
+        (v.stops.length ? '<ol class="stops-list">' + v.stops.map(function(s){ return '<li>' + esc(s.name) + '</li>'; }).join('') + '</ol>' : '');
+
+      var valDiv = document.createElement('div');
+      valDiv.className = 'validation';
+      valDiv.innerHTML =
+        '<label>Estado de validación</label>' +
+        '<div class="validation-row">' +
+          '<button type="button" data-status="ok">✓ Correcta</button>' +
+          '<button type="button" data-status="fix">⚠ Corregir</button>' +
+          '<button type="button" data-status="reject">✗ No es nuestra</button>' +
+        '</div>' +
+        '<label>Observaciones</label>' +
+        '<textarea placeholder="Detalle de correcciones…"></textarea>';
+
+      var saved = validation[v.osmId] || {};
+      valDiv.querySelectorAll('[data-status]').forEach(function (btn) {
+        if (saved.status === btn.dataset.status) btn.classList.add('active');
+        btn.addEventListener('click', function () {
+          valDiv.querySelectorAll('[data-status]').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          validation[v.osmId] = validation[v.osmId] || {};
+          validation[v.osmId].status = btn.dataset.status;
+          validation[v.osmId].updatedAt = new Date().toISOString();
+          saveValidation(validation);
+        });
+      });
+      var notes = valDiv.querySelector('textarea');
+      notes.value = saved.notes || '';
+      notes.addEventListener('input', function () {
+        validation[v.osmId] = validation[v.osmId] || {};
+        validation[v.osmId].notes = notes.value;
+        validation[v.osmId].updatedAt = new Date().toISOString();
+        saveValidation(validation);
+      });
+
+      block.appendChild(valDiv);
+      block.querySelector('.show-on-map').addEventListener('click', function (e) {
+        e.preventDefault();
+        setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+        document.getElementById('overview-map').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      variantsCol.appendChild(block);
+    });
+
+    grid.appendChild(variantsCol);
+    body.appendChild(grid);
+    card.appendChild(body);
+    container.appendChild(card);
+
+    header.addEventListener('click', function () {
+      card.classList.toggle('open');
+      if (card.classList.contains('open') && !routeMaps[group.ref]) initRefMap(group, mapDiv);
+    });
+  });
+
+  function initRefMap(group, el) {
+    var map = L.map(el, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(map);
+    var bounds = L.latLngBounds([]);
+    var hues = ['#2563eb','#dc2626','#16a34a','#9333ea','#d97706','#0891b2'];
+    group.variants.forEach(function (v, i) {
+      if (!v.coordinates.length) return;
+      var color = hues[i % hues.length];
+      var latlngs = coordsToLatLngs(v.coordinates);
+      L.polyline(latlngs, { color: color, weight: 5 }).bindPopup(buildPopup(v)).addTo(map);
+      addDirectionArrow(map, latlngs, color);
+      latlngs.forEach(function (ll) { bounds.extend(ll); });
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], { radius: STOP_RADIUS, color: color, fillOpacity: 0.7, weight: 1 })
+          .bindPopup(esc(s.name)).addTo(map);
+      });
+    });
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] });
+    routeMaps[group.ref] = map;
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  }
+
+  function applyFilters() {
+    var q = document.getElementById('search').value.toLowerCase().trim();
+    var refFilter = document.getElementById('filter-ref').value;
+    document.querySelectorAll('.route-card').forEach(function (card) {
+      var ref = card.dataset.ref;
+      var visible = !refFilter || ref === refFilter;
+      if (visible && q) {
+        visible = false;
+        card.querySelectorAll('.variant-block').forEach(function (vb) {
+          var match = vb.dataset.search.indexOf(q) >= 0;
+          vb.style.display = match ? '' : 'none';
+          if (match) visible = true;
+        });
+      } else {
+        card.querySelectorAll('.variant-block').forEach(function (vb) { vb.style.display = ''; });
+      }
+      card.classList.toggle('hidden', !visible);
+    });
+    document.querySelectorAll('.vis-ref-group').forEach(function (rg) {
+      var ref = rg.dataset.ref;
+      var show = !refFilter || ref === refFilter;
+      if (show && q) {
+        var any = false;
+        rg.querySelectorAll('.vis-variant').forEach(function (row) {
+          var match = row.dataset.search.indexOf(q) >= 0;
+          row.style.display = match ? '' : 'none';
+          if (match) any = true;
+        });
+        rg.style.display = any ? '' : 'none';
+      } else {
+        rg.style.display = show ? '' : 'none';
+        rg.querySelectorAll('.vis-variant').forEach(function (row) { row.style.display = ''; });
+      }
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('filter-ref').addEventListener('change', applyFilters);
+
+  function updateProgress() {
+    var total = 0, done = 0;
+    REPORT.refGroups.forEach(function (g) {
+      g.variants.forEach(function (v) {
+        total++;
+        if (validation[v.osmId] && validation[v.osmId].status) done++;
+      });
+    });
+    document.getElementById('progress').textContent = done + ' / ' + total + ' validadas';
+  }
+
+  document.getElementById('export-json').addEventListener('click', function () {
+    var payload = {
+      slug: REPORT.slug, operator: REPORT.operator, cityName: REPORT.cityName,
+      exportedAt: new Date().toISOString(), validations: validation,
+      routes: REPORT.refGroups.flatMap(function (g) {
+        return g.variants.map(function (v) {
+          return { osmId: v.osmId, ref: v.ref, from: v.from, to: v.to, direction: v.directionLabel, validation: validation[v.osmId] || null };
+        });
+      })
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'validacion-' + REPORT.slug + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  refreshAllStyles();
+  updateProgress();
+
+  function invalidateMap() {
+    setTimeout(function () { overviewMap.invalidateSize(); }, 50);
+  }
+
+  function toggleSidebar() {
+    var sb = document.getElementById('map-sidebar');
+    sb.classList.toggle('collapsed');
+    invalidateMap();
+  }
+
+  document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
+  document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
+  window.addEventListener('resize', invalidateMap);
+  invalidateMap();
+})();
+  </script>
+</body>
+</html>

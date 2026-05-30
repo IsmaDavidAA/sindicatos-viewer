@@ -1,0 +1,16 @@
+{
+  "name": "sindicatos-routes",
+  "version": "1.0.0",
+  "description": "Interactive sindicato route validation reports for GitHub Pages",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "generate": "ts-node src/generate.ts",
+    "generate:cochabamba": "ts-node src/generate.ts cochabamba"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  }
+}

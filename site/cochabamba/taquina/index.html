@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Taquiña — Validación de rutas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --bg: #f4f6f8; --card: #fff; --text: #1a1a2e; --muted: #5c6370;
+      --accent: #2563eb; --accent-hover: #1d4ed8; --highlight: #f59e0b;
+      --ok: #16a34a; --warn: #d97706; --err: #dc2626; --border: #e2e8f0;
+      --dim: #cbd5e1; --ida: #2563eb; --vuelta: #9333ea;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      display: flex; flex-direction: column;
+    }
+    .top-chrome {
+      flex-shrink: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      z-index: 600;
+    }
+    .top-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: #fff;
+    }
+    .top-row h1 { margin: 0; font-size: 1.05rem; font-weight: 600; flex: 1; min-width: 10rem; }
+    .top-meta { font-size: 0.78rem; opacity: 0.9; white-space: nowrap; }
+    .stats { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .stat { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.75rem; white-space: nowrap; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      align-items: center;
+      background: var(--card);
+    }
+    .toolbar input, .toolbar select, .toolbar button {
+      font: inherit; padding: 0.35rem 0.55rem; border: 1px solid var(--border);
+      border-radius: 6px; background: #fff; font-size: 0.85rem;
+    }
+    .toolbar input[type=search] { flex: 1; min-width: 8rem; max-width: 16rem; }
+    .toolbar button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+    .toolbar button:hover { background: var(--accent-hover); }
+    .toolbar button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
+    .toolbar button.icon-btn { padding: 0.35rem 0.6rem; min-width: 2rem; }
+    .progress-bar { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .map-workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      height: calc(100vh - 6.5rem);
+      max-height: calc(100vh - 6.5rem);
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .sidebar-toggle {
+      display: none;
+      position: absolute; top: 0.5rem; left: 0.5rem; z-index: 450;
+      font: inherit; font-size: 0.8rem; padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: rgba(255,255,255,0.95); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    .map-sidebar {
+      width: 300px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      height: 100%; min-height: 0;
+      background: #fafbfc;
+      transition: transform 0.2s ease, width 0.2s ease;
+      z-index: 440;
+    }
+    .map-sidebar.collapsed { width: 0; overflow: hidden; border-right: none; }
+    .map-sidebar-head { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0; }
+    .map-sidebar-head h2 { margin: 0 0 0.3rem; font-size: 0.88rem; }
+    .map-sidebar-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .map-sidebar-actions button {
+      font: inherit; font-size: 0.72rem; padding: 0.22rem 0.45rem;
+      border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer;
+    }
+    .map-sidebar-actions button:hover { background: #e2e8f0; }
+    .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
+    .vis-ref-group { border-bottom: 1px solid var(--border); }
+    .vis-ref-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; background: #fafbfc; cursor: pointer; }
+    .vis-ref-head input { margin: 0; }
+    .vis-variant { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem 0.75rem 0.3rem 1.15rem; font-size: 0.76rem; cursor: pointer; border-left: 3px solid transparent; }
+    .vis-variant:hover { background: #f8fafc; }
+    .vis-variant.selected { background: #fffbeb; border-left-color: var(--highlight); }
+    .vis-variant input { margin-top: 0.12rem; flex-shrink: 0; }
+    .vis-variant-text { flex: 1; min-width: 0; }
+    .vis-variant-text strong { display: block; font-weight: 500; font-size: 0.78rem; }
+    .dir-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 0.08rem 0.3rem; border-radius: 4px; margin-right: 0.2rem; }
+    .dir-ida { background: #dbeafe; color: var(--ida); }
+    .dir-vuelta { background: #ede9fe; color: var(--vuelta); }
+    .dir-unico { background: #f1f5f9; color: var(--muted); }
+    .map-main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0; }
+    .map-main-head {
+      padding: 0.35rem 0.75rem; font-size: 0.78rem; color: var(--muted);
+      border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0;
+    }
+    .map-wrap { position: relative; flex: 1; min-height: 0; }
+    #overview-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-empty-hint {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(255,255,255,0.94); padding: 0.65rem 1rem; border-radius: 8px;
+      font-size: 0.85rem; color: var(--muted); pointer-events: none; z-index: 400;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+    .dir-arrow-icon { background: none !important; border: none !important; font-size: 14px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 4px #fff; }
+    .validation-panel {
+      flex-shrink: 0;
+      max-width: 1200px; width: 100%; margin: 0 auto;
+      padding: 1.25rem 1rem 2rem;
+    }
+    .validation-panel > h2 { margin: 0 0 1rem; font-size: 1.1rem; color: var(--text); }
+    .route-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+    .route-card.hidden { display: none; }
+    .route-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.75rem 1rem; cursor: pointer; user-select: none; }
+    .route-header:hover { background: #f8fafc; }
+    .route-badge { font-weight: 700; font-size: 1.1rem; color: var(--accent); min-width: 3rem; }
+    .route-title { flex: 1; font-size: 0.95rem; }
+    .route-meta { font-size: 0.8rem; color: var(--muted); }
+    .route-body { display: none; border-top: 1px solid var(--border); }
+    .route-card.open .route-body { display: block; }
+    .route-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; }
+    @media (max-width: 768px) { .route-grid { grid-template-columns: 1fr; } }
+    .route-map { height: 260px; border-radius: 8px; border: 1px solid var(--border); }
+    .variant-block { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .variant-block:last-child { margin-bottom: 0; }
+    .variant-block h4 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+    .variant-links a { color: var(--accent); font-size: 0.85rem; margin-right: 1rem; }
+    .validation { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); }
+    .validation label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .validation-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+    .validation-row button { font: inherit; font-size: 0.8rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; cursor: pointer; }
+    .validation-row button.active[data-status="ok"] { background: #dcfce7; border-color: var(--ok); color: var(--ok); }
+    .validation-row button.active[data-status="fix"] { background: #fef3c7; border-color: var(--warn); color: var(--warn); }
+    .validation-row button.active[data-status="reject"] { background: #fee2e2; border-color: var(--err); color: var(--err); }
+    .validation textarea { width: 100%; min-height: 2.5rem; font: inherit; font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+    .stops-list { max-height: 180px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem; }
+    footer.app-footer { flex-shrink: 0; text-align: center; padding: 0.75rem; font-size: 0.75rem; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
+    .status-ok { color: var(--ok); }
+    .status-err { color: var(--err); }
+    @media (max-width: 900px) {
+      .map-workspace { height: calc(100vh - 7rem); max-height: calc(100vh - 7rem); }
+      .sidebar-toggle { display: block; }
+      .map-sidebar {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        box-shadow: 4px 0 16px rgba(0,0,0,0.15);
+      }
+      .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-chrome">
+    <div class="top-row">
+      <h1>Taquiña</h1>
+      <span class="top-meta">cochabamba · 2026-05-30</span>
+      <div class="stats">
+        <span class="stat">2 relaciones</span>
+        <span class="stat">1 líneas</span>
+        <span class="stat">0 errores</span>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar ref, origen, destino…" aria-label="Buscar rutas">
+      <select id="filter-ref" aria-label="Filtrar por línea">
+        <option value="">Todas las líneas</option>
+        <option value="Taquiña">Taquiña (2)</option>
+      </select>
+      <button type="button" class="secondary icon-btn" id="toggle-sidebar" title="Mostrar/ocultar panel de rutas">☰</button>
+      <button type="button" class="secondary" id="export-json">Exportar</button>
+      <span class="progress-bar" id="progress">0 / 0 validadas</span>
+    </div>
+  </div>
+
+  <div class="map-workspace">
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle-mobile">☰ Rutas</button>
+    <aside class="map-sidebar" id="map-sidebar">
+      <div class="map-sidebar-head">
+        <h2>Rutas en mapa</h2>
+        <div class="map-sidebar-actions">
+          <button type="button" id="vis-all">Todas</button>
+          <button type="button" id="vis-none">Ninguna</button>
+          <button type="button" id="fit-visible">Ajustar</button>
+        </div>
+      </div>
+      <div class="route-visibility-list" id="visibility-list"></div>
+    </aside>
+    <div class="map-main">
+      <div class="map-main-head" id="map-status">Seleccione rutas · clic en línea para resaltar</div>
+      <div class="map-wrap">
+        <div id="overview-map"></div>
+        <div class="map-empty-hint" id="map-hint">Marque rutas en el panel ← para verlas en el mapa</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="validation-panel">
+    <h2>Detalle y validación por ruta</h2>
+    <div id="routes-container"></div>
+  </section>
+
+  <footer class="app-footer">
+    Generado por <a href="https://www.trufi-association.org/" target="_blank" rel="noopener">Trufi Association</a> · observaciones guardadas localmente
+  </footer>
+
+  <script id="report-data" type="application/json">{"slug":"taquina","operator":"Taquiña","cityName":"cochabamba","generatedAt":"2026-05-30T19:13:11.079Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":61},"refGroups":[{"ref":"Taquiña","gtfsRouteId":44,"routeColor":"888888","routeLongName":"Trufi Taquiña","variants":[{"osmId":9386184,"ref":"Taquiña","name":"Trufi Taquiña: Cruce Taquiña → Planta Taquiña","from":"Cruce Taquiña","to":"Planta Taquiña","description":"","tripHeadsign":"Planta Taquiña","routeType":"bus","gtfsRouteId":44,"routeColor":"888888","stopCount":31,"stops":[{"id":11535045440,"name":"Avenida Simón López","lat":-17.3546007,"lon":-66.1875161},{"id":7814223044,"name":"Avenida Centenario","lat":-17.3540242,"lon":-66.1873775},{"id":11486083223,"name":"Avenida Centenario","lat":-17.3519658,"lon":-66.186065},{"id":601871700,"name":"Avenida Centenario","lat":-17.3506681,"lon":-66.1848103},{"id":5290354590,"name":"Rotonda Circunvalación Beijing y Centenario y Avenida Centenario","lat":-17.3505203,"lon":-66.1845282},{"id":9049566118,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.350445,"lon":-66.1843972},{"id":9343671210,"name":"Avenida Centenario","lat":-17.35034,"lon":-66.1843539},{"id":2318865845,"name":"Avenida Centenario","lat":-17.3500126,"lon":-66.1841563},{"id":2318865814,"name":"Avenida Centenario","lat":-17.3482265,"lon":-66.1830568},{"id":11813320201,"name":"Avenida Centenario","lat":-17.3478156,"lon":-66.1829083},{"id":2318865756,"name":"Avenida Centenario","lat":-17.3466748,"lon":-66.1830371},{"id":2318865729,"name":"Avenida Centenario","lat":-17.3450696,"lon":-66.1832729},{"id":2318865713,"name":"Avenida Centenario","lat":-17.3440623,"lon":-66.1833137},{"id":2318865693,"name":"Avenida Centenario","lat":-17.3429886,"lon":-66.1832772},{"id":3281400409,"name":"Avenida Centenario","lat":-17.3420199,"lon":-66.1833169},{"id":1583335234,"name":"Avenida Centenario","lat":-17.3409587,"lon":-66.1835303},{"id":1583335462,"name":"Avenida Centenario","lat":-17.3385004,"lon":-66.1832061},{"id":7245757843,"name":"Avenida Centenario","lat":-17.3371529,"lon":-66.1833119},{"id":1583335328,"name":"Avenida Centenario","lat":-17.3365805,"lon":-66.1834593},{"id":3281400287,"name":"Avenida Centenario","lat":-17.3348212,"lon":-66.1836277},{"id":1583335321,"name":"Avenida Centenario","lat":-17.3343349,"lon":-66.1835533},{"id":1583335297,"name":"Avenida Centenario","lat":-17.3338547,"lon":-66.1835333},{"id":1583335270,"name":"Avenida Centenario","lat":-17.3327959,"lon":-66.1836193},{"id":1583335362,"name":"Avenida Centenario","lat":-17.3324792,"lon":-66.1833671},{"id":3281400275,"name":"Avenida Centenario","lat":-17.3321778,"lon":-66.1831079},{"id":3281400274,"name":"Avenida Centenario","lat":-17.3317824,"lon":-66.1830757},{"id":3281400271,"name":"Avenida Centenario","lat":-17.3313978,"lon":-66.1829246},{"id":10074224270,"name":"Avenida Centenario","lat":-17.3311127,"lon":-66.1830527},{"id":4237666301,"name":"Avenida Centenario","lat":-17.3303064,"lon":-66.1845891},{"id":4237671848,"name":"Avenida Centenario","lat":-17.3292236,"lon":-66.1851916},{"id":1583335363,"name":"Avenida Centenario","lat":-17.3286237,"lon":-66.185049}],"coordinates":[[-66.1875161,-17.3546007],[-66.1874929,-17.3545067],[-66.1874286,-17.3542617],[-66.1873663,-17.3541458],[-66.1873775,-17.3540242],[-66.1872937,-17.3538857],[-66.1871481,-17.3536482],[-66.1861434,-17.3520867],[-66.1861017,-17.3520162],[-66.186065,-17.3519658],[-66.1858522,-17.3516733],[-66.1857698,-17.3515687],[-66.1856447,-17.3514444],[-66.1848103,-17.3506681],[-66.1847541,-17.3506389],[-66.1846645,-17.3505718],[-66.184614,-17.3505451],[-66.1845282,-17.3505203],[-66.1845006,-17.3505191],[-66.1844682,-17.3505106],[-66.184439,-17.3504947],[-66.1844148,-17.3504723],[-66.1843972,-17.350445],[-66.1843872,-17.3504143],[-66.1843854,-17.3503822],[-66.1843887,-17.3503619],[-66.1843539,-17.35034],[-66.1843332,-17.3503167],[-66.1842927,-17.35025],[-66.1842576,-17.350188],[-66.1842669,-17.3501375],[-66.1841563,-17.3500126],[-66.1840928,-17.3499413],[-66.1840229,-17.3498411],[-66.1836296,-17.3491889],[-66.1830568,-17.3482265],[-66.1829677,-17.348053],[-66.1829276,-17.3479493],[-66.1829118,-17.3478907],[-66.1829083,-17.3478156],[-66.1829112,-17.3476633],[-66.1829465,-17.3473787],[-66.1830077,-17.3468884],[-66.1830306,-17.346728],[-66.1830371,-17.3466748],[-66.1830464,-17.3466109],[-66.1831552,-17.3458667],[-66.1832556,-17.345172],[-66.1832729,-17.3450696],[-66.1833221,-17.3446344],[-66.1833331,-17.3444964],[-66.1833463,-17.3443677],[-66.1833137,-17.3440623],[-66.1833156,-17.343814],[-66.1833281,-17.3435946],[-66.1833205,-17.3433258],[-66.1833032,-17.3432124],[-66.1832772,-17.3429886],[-66.183266,-17.3428618],[-66.1832708,-17.3427804],[-66.1833065,-17.3424033],[-66.1833169,-17.3420199],[-66.1833683,-17.3417525],[-66.1834304,-17.3414975],[-66.1834724,-17.3413503],[-66.1835184,-17.3411215],[-66.1835303,-17.3409587],[-66.1834677,-17.3404596],[-66.183458,-17.3404028],[-66.1832851,-17.3393115],[-66.1832061,-17.3385004],[-66.1831954,-17.3382791],[-66.1832054,-17.3381585],[-66.1832994,-17.3372232],[-66.1833119,-17.3371529],[-66.1833375,-17.3370094],[-66.183413,-17.3367728],[-66.1834218,-17.3367346],[-66.1834507,-17.3366449],[-66.1834593,-17.3365805],[-66.1834133,-17.3356584],[-66.1834663,-17.3353881],[-66.1835007,-17.335272],[-66.1836277,-17.3348212],[-66.1836415,-17.3347235],[-66.183636,-17.3345969],[-66.1836096,-17.3344892],[-66.1835533,-17.3343349],[-66.1835281,-17.3342243],[-66.1835233,-17.3341896],[-66.1835095,-17.3340884],[-66.1835169,-17.3339372],[-66.1835333,-17.3338547],[-66.1835695,-17.3336565],[-66.1836183,-17.3331559],[-66.183632,-17.3329838],[-66.1836193,-17.3327959],[-66.1835926,-17.3327114],[-66.1835388,-17.3326268],[-66.1834741,-17.332554],[-66.1833671,-17.3324792],[-66.1832869,-17.3324382],[-66.1832092,-17.3323851],[-66.1831627,-17.3323336],[-66.1831293,-17.3322725],[-66.1831079,-17.3321778],[-66.1831058,-17.3320973],[-66.183115,-17.3320348],[-66.1831042,-17.3318766],[-66.1830757,-17.3317824],[-66.1830397,-17.3317022],[-66.1829987,-17.3316237],[-66.1829674,-17.3315536],[-66.1829387,-17.3314641],[-66.1829246,-17.3313978],[-66.1829215,-17.3313204],[-66.1829294,-17.3312364],[-66.18296,-17.3311833],[-66.1830527,-17.3311127],[-66.1831582,-17.3310401],[-66.1843941,-17.3304601],[-66.1845065,-17.3303779],[-66.1845891,-17.3303064],[-66.1848064,-17.3300006],[-66.1849528,-17.3298393],[-66.1850234,-17.3297418],[-66.1850432,-17.3296638],[-66.1851916,-17.3292236],[-66.1852352,-17.3290366],[-66.1852277,-17.3289512],[-66.1851918,-17.3288119],[-66.1851334,-17.3286933],[-66.185049,-17.3286237]],"osmUrl":"https://www.openstreetmap.org/relation/9386184","status":"ok","errorMessage":"","fee":"yes","onDemand":"yes","directionLabel":"ida","directionId":1},{"osmId":10789860,"ref":"Taquiña","name":"Trufi Taquiña: Planta Taquiña → Cruce Taquiña","from":"Planta Taquiña","to":"Cruce Taquiña","description":"","tripHeadsign":"Cruce Taquiña","routeType":"bus","gtfsRouteId":44,"routeColor":"888888","stopCount":30,"stops":[{"id":1583335363,"name":"Avenida Centenario","lat":-17.3286237,"lon":-66.185049},{"id":1583335288,"name":"Avenida Centenario","lat":-17.3290366,"lon":-66.1852352},{"id":4237666296,"name":"Avenida Centenario","lat":-17.3300006,"lon":-66.1848064},{"id":8762265495,"name":"Avenida Centenario","lat":-17.3310401,"lon":-66.1831582},{"id":3281400271,"name":"Avenida Centenario","lat":-17.3313978,"lon":-66.1829246},{"id":1583335394,"name":"Avenida Centenario","lat":-17.3317022,"lon":-66.1830397},{"id":3281400275,"name":"Avenida Centenario","lat":-17.3321778,"lon":-66.1831079},{"id":3281400278,"name":"Avenida Centenario","lat":-17.3324382,"lon":-66.1832869},{"id":1583335270,"name":"Avenida Centenario","lat":-17.3327959,"lon":-66.1836193},{"id":1583335297,"name":"Avenida Centenario","lat":-17.3338547,"lon":-66.1835333},{"id":1583335321,"name":"Avenida Centenario","lat":-17.3343349,"lon":-66.1835533},{"id":3281400287,"name":"Avenida Centenario","lat":-17.3348212,"lon":-66.1836277},{"id":2087373751,"name":"Avenida Centenario","lat":-17.3366449,"lon":-66.1834507},{"id":7245757843,"name":"Avenida Centenario","lat":-17.3371529,"lon":-66.1833119},{"id":2318865643,"name":"Avenida Centenario","lat":-17.3393115,"lon":-66.1832851},{"id":1583335330,"name":"Avenida Centenario","lat":-17.3411215,"lon":-66.1835184},{"id":1583335267,"name":"Avenida Centenario","lat":-17.3424033,"lon":-66.1833065},{"id":1583335284,"name":"Avenida Centenario","lat":-17.3432124,"lon":-66.1833032},{"id":2318865718,"name":"Avenida Centenario","lat":-17.3443677,"lon":-66.1833463},{"id":2318865732,"name":"Avenida Centenario","lat":-17.345172,"lon":-66.1832556},{"id":2318865762,"name":"Avenida Centenario","lat":-17.3468884,"lon":-66.1830077},{"id":1583335499,"name":"Avenida Centenario","lat":-17.3478907,"lon":-66.1829118},{"id":1583335179,"name":"Avenida Centenario","lat":-17.3498411,"lon":-66.1840229},{"id":2368317080,"name":"Avenida Centenario","lat":-17.3501513,"lon":-66.1843085},{"id":9819008046,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.3502664,"lon":-66.1845506},{"id":11486083230,"name":"Rotonda Circunvalación Beijing y Centenario","lat":-17.3503376,"lon":-66.1846434},{"id":9049566109,"name":"Avenida Centenario","lat":-17.350537,"lon":-66.1847036},{"id":3279659560,"name":"Avenida Centenario","lat":-17.3515687,"lon":-66.1857698},{"id":9049626817,"name":"Avenida Centenario","lat":-17.3536482,"lon":-66.1871481},{"id":851595310,"name":"Avenida Simón López y Avenida Centenario","lat":-17.3544767,"lon":-66.1876781}],"coordinates":[[-66.185049,-17.3286237],[-66.1851334,-17.3286933],[-66.1851918,-17.3288119],[-66.1852277,-17.3289512],[-66.1852352,-17.3290366],[-66.1851916,-17.3292236],[-66.1850432,-17.3296638],[-66.1850234,-17.3297418],[-66.1849528,-17.3298393],[-66.1848064,-17.3300006],[-66.1845891,-17.3303064],[-66.1845065,-17.3303779],[-66.1843941,-17.3304601],[-66.1831582,-17.3310401],[-66.1830527,-17.3311127],[-66.18296,-17.3311833],[-66.1829294,-17.3312364],[-66.1829215,-17.3313204],[-66.1829246,-17.3313978],[-66.1829387,-17.3314641],[-66.1829674,-17.3315536],[-66.1829987,-17.3316237],[-66.1830397,-17.3317022],[-66.1830757,-17.3317824],[-66.1831042,-17.3318766],[-66.183115,-17.3320348],[-66.1831058,-17.3320973],[-66.1831079,-17.3321778],[-66.1831293,-17.3322725],[-66.1831627,-17.3323336],[-66.1832092,-17.3323851],[-66.1832869,-17.3324382],[-66.1833671,-17.3324792],[-66.1834741,-17.332554],[-66.1835388,-17.3326268],[-66.1835926,-17.3327114],[-66.1836193,-17.3327959],[-66.183632,-17.3329838],[-66.1836183,-17.3331559],[-66.1835695,-17.3336565],[-66.1835333,-17.3338547],[-66.1835169,-17.3339372],[-66.1835095,-17.3340884],[-66.1835233,-17.3341896],[-66.1835281,-17.3342243],[-66.1835533,-17.3343349],[-66.1836096,-17.3344892],[-66.183636,-17.3345969],[-66.1836415,-17.3347235],[-66.1836277,-17.3348212],[-66.1835007,-17.335272],[-66.1834663,-17.3353881],[-66.1834133,-17.3356584],[-66.1834593,-17.3365805],[-66.1834507,-17.3366449],[-66.1834218,-17.3367346],[-66.183413,-17.3367728],[-66.1833375,-17.3370094],[-66.1833119,-17.3371529],[-66.1832994,-17.3372232],[-66.1832054,-17.3381585],[-66.1831954,-17.3382791],[-66.1832061,-17.3385004],[-66.1832851,-17.3393115],[-66.183458,-17.3404028],[-66.1834677,-17.3404596],[-66.1835303,-17.3409587],[-66.1835184,-17.3411215],[-66.1834724,-17.3413503],[-66.1834304,-17.3414975],[-66.1833683,-17.3417525],[-66.1833169,-17.3420199],[-66.1833065,-17.3424033],[-66.1832708,-17.3427804],[-66.183266,-17.3428618],[-66.1832772,-17.3429886],[-66.1833032,-17.3432124],[-66.1833205,-17.3433258],[-66.1833281,-17.3435946],[-66.1833156,-17.343814],[-66.1833137,-17.3440623],[-66.1833463,-17.3443677],[-66.1833331,-17.3444964],[-66.1833221,-17.3446344],[-66.1832729,-17.3450696],[-66.1832556,-17.345172],[-66.1831552,-17.3458667],[-66.1830464,-17.3466109],[-66.1830371,-17.3466748],[-66.1830306,-17.346728],[-66.1830077,-17.3468884],[-66.1829465,-17.3473787],[-66.1829112,-17.3476633],[-66.1829083,-17.3478156],[-66.1829118,-17.3478907],[-66.1829276,-17.3479493],[-66.1829677,-17.348053],[-66.1830568,-17.3482265],[-66.1836296,-17.3491889],[-66.1840229,-17.3498411],[-66.1840928,-17.3499413],[-66.1841563,-17.3500126],[-66.1842669,-17.3501375],[-66.1843085,-17.3501513],[-66.1843773,-17.3502007],[-66.1844345,-17.3502214],[-66.1845064,-17.3502635],[-66.1845269,-17.350263],[-66.1845506,-17.3502664],[-66.1845742,-17.3502737],[-66.1845987,-17.350287],[-66.1846268,-17.3503096],[-66.1846434,-17.3503376],[-66.1846538,-17.3503746],[-66.184655,-17.3503943],[-66.1846496,-17.3504322],[-66.1846759,-17.3504945],[-66.1847036,-17.350537],[-66.1847735,-17.3506081],[-66.1848103,-17.3506681],[-66.1856447,-17.3514444],[-66.1857698,-17.3515687],[-66.1858522,-17.3516733],[-66.186065,-17.3519658],[-66.1861017,-17.3520162],[-66.1861434,-17.3520867],[-66.1871481,-17.3536482],[-66.1872937,-17.3538857],[-66.1873775,-17.3540242],[-66.1876269,-17.3543984],[-66.187654,-17.3544399],[-66.1876781,-17.3544767]],"osmUrl":"https://www.openstreetmap.org/relation/10789860","status":"ok","errorMessage":"","fee":"","onDemand":"yes","directionLabel":"vuelta","directionId":0}]}]}</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+(function () {
+  const REPORT = JSON.parse(document.getElementById('report-data').textContent);
+  const STORAGE_KEY = 'trufi-validation-' + REPORT.slug;
+  const VIS_KEY = 'trufi-vis-' + REPORT.slug;
+
+  const HIGHLIGHT_COLOR = '#f59e0b';
+  const DIM_COLOR = '#94a3b8';
+  const STOP_RADIUS = 2;
+  const STOP_RADIUS_SELECTED = 4;
+
+  function loadValidation() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveValidation(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    updateProgress();
+  }
+  function loadVisibility() {
+    try { return JSON.parse(localStorage.getItem(VIS_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveVisibility(data) {
+    localStorage.setItem(VIS_KEY, JSON.stringify(data));
+  }
+
+  const validation = loadValidation();
+  const visibility = loadVisibility();
+  let selectedOsmId = null;
+
+  const overviewMap = L.map('overview-map', { scrollWheelZoom: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(overviewMap);
+  overviewMap.setView([-17.39, -66.16], 12);
+
+  const variantLayers = {};
+  const routeMaps = {};
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  }
+  function hexColor(c) { return c && String(c).length >= 3 ? '#' + String(c).replace('#','') : '#64748b'; }
+  function coordsToLatLngs(coords) {
+    return coords.map(function (c) { return [c[1], c[0]]; });
+  }
+  function dirLabelHtml(label) {
+    if (label === 'ida') return '<span class="dir-badge dir-ida">→ Ida</span>';
+    if (label === 'vuelta') return '<span class="dir-badge dir-vuelta">← Vuelta</span>';
+    return '<span class="dir-badge dir-unico">↔ Único</span>';
+  }
+  function dirLabelText(label) {
+    if (label === 'ida') return 'Ida';
+    if (label === 'vuelta') return 'Vuelta';
+    return 'Único';
+  }
+  function buildPopup(v) {
+    return dirLabelHtml(v.directionLabel) +
+      ' <strong>' + esc(v.ref) + '</strong><br>' +
+      esc(v.from) + ' → ' + esc(v.to) +
+      (v.description ? '<br><em>' + esc(v.description) + '</em>' : '') +
+      '<br><a href="' + v.osmUrl + '" target="_blank" rel="noopener">Ver en OSM</a>';
+  }
+  function addDirectionArrow(layerGroup, latlngs, color) {
+    if (latlngs.length < 2) return null;
+    var idx = Math.min(Math.floor(latlngs.length * 0.75), latlngs.length - 1);
+    var p1 = latlngs[Math.max(0, idx - 1)];
+    var p2 = latlngs[idx];
+    var angle = Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180 / Math.PI;
+    var marker = L.marker(p2, {
+      icon: L.divIcon({
+        className: 'dir-arrow-icon',
+        html: '<div style="transform:rotate(' + angle + 'deg);color:' + color + ';font-weight:bold">▶</div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      }),
+      interactive: false
+    });
+    marker.addTo(layerGroup);
+    return marker;
+  }
+
+  function styleVariant(osmId) {
+    var entry = variantLayers[osmId];
+    if (!entry || !entry.visible) return;
+    var v = entry.variant;
+    var isSelected = selectedOsmId === osmId;
+    var baseColor = hexColor(v.routeColor || entry.refColor);
+
+    if (isSelected) {
+      entry.line.setStyle({ color: HIGHLIGHT_COLOR, weight: 6, opacity: 1 });
+      if (entry.arrow) entry.arrow.setOpacity(1);
+    } else if (selectedOsmId !== null) {
+      entry.line.setStyle({ color: DIM_COLOR, weight: 3, opacity: 0.35 });
+      if (entry.arrow) entry.arrow.setOpacity(0.3);
+    } else {
+      entry.line.setStyle({ color: baseColor, weight: 4, opacity: 0.85 });
+      if (entry.arrow) entry.arrow.setOpacity(0.9);
+    }
+
+    entry.stops.clearLayers();
+    if (isSelected && v.stops && v.stops.length) {
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], {
+          radius: STOP_RADIUS_SELECTED,
+          color: HIGHLIGHT_COLOR,
+          fillColor: HIGHLIGHT_COLOR,
+          fillOpacity: 0.85,
+          weight: 1
+        }).bindPopup(esc(s.name)).addTo(entry.stops);
+      });
+    }
+  }
+
+  function refreshAllStyles() {
+    Object.keys(variantLayers).forEach(function (id) { styleVariant(Number(id)); });
+    var anyVisible = Object.values(variantLayers).some(function (e) { return e.visible; });
+    document.getElementById('map-hint').style.display = anyVisible ? 'none' : 'block';
+    var n = Object.values(variantLayers).filter(function (e) { return e.visible; }).length;
+    var status = n + ' ruta(s) visible(s)';
+    if (selectedOsmId && variantLayers[selectedOsmId]) {
+      var sv = variantLayers[selectedOsmId].variant;
+      status += ' · Seleccionada: ' + dirLabelText(sv.directionLabel) + ' ' + sv.from + ' → ' + sv.to;
+    }
+    document.getElementById('map-status').textContent = status;
+  }
+
+  function selectVariant(osmId) {
+    selectedOsmId = osmId;
+    document.querySelectorAll('.vis-variant').forEach(function (el) {
+      el.classList.toggle('selected', Number(el.dataset.osmId) === osmId);
+    });
+    refreshAllStyles();
+    var entry = variantLayers[osmId];
+    if (entry && entry.line) {
+      overviewMap.fitBounds(entry.line.getBounds(), { padding: [48, 48] });
+    }
+  }
+
+  function setVariantVisible(osmId, visible) {
+    var entry = variantLayers[osmId];
+    if (!entry) return;
+    entry.visible = visible;
+    visibility[osmId] = visible;
+    saveVisibility(visibility);
+
+    if (visible) {
+      entry.group.addTo(overviewMap);
+    } else {
+      overviewMap.removeLayer(entry.group);
+      if (selectedOsmId === osmId) selectedOsmId = null;
+    }
+    var cb = document.querySelector('.vis-variant[data-osm-id="' + osmId + '"] input');
+    if (cb) cb.checked = visible;
+    refreshAllStyles();
+  }
+
+  REPORT.refGroups.forEach(function (group) {
+    var refColor = hexColor(group.routeColor);
+
+    group.variants.forEach(function (v) {
+      if (!v.coordinates || !v.coordinates.length) return;
+
+      var latlngs = coordsToLatLngs(v.coordinates);
+      var groupLayer = L.layerGroup();
+      var stopsLayer = L.layerGroup();
+      var line = L.polyline(latlngs, { color: refColor, weight: 4, opacity: 0.85 });
+      line.bindPopup(buildPopup(v));
+      line.on('click', function (e) {
+        L.DomEvent.stopPropagation(e);
+        if (!variantLayers[v.osmId].visible) setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+      });
+      line.addTo(groupLayer);
+      var arrow = addDirectionArrow(groupLayer, latlngs, refColor);
+      stopsLayer.addTo(groupLayer);
+
+      variantLayers[v.osmId] = {
+        osmId: v.osmId,
+        ref: group.ref,
+        refColor: group.routeColor,
+        variant: v,
+        group: groupLayer,
+        line: line,
+        stops: stopsLayer,
+        arrow: arrow,
+        visible: false
+      };
+    });
+  });
+
+  var visList = document.getElementById('visibility-list');
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = document.createElement('div');
+    refBlock.className = 'vis-ref-group';
+    refBlock.dataset.ref = group.ref;
+
+    var refHead = document.createElement('div');
+    refHead.className = 'vis-ref-head';
+    var refCb = document.createElement('input');
+    refCb.type = 'checkbox';
+    refCb.title = 'Mostrar/ocultar línea ' + group.ref;
+    refHead.appendChild(refCb);
+    refHead.appendChild(document.createTextNode(' Línea ' + group.ref + ' (' + group.variants.length + ')'));
+    refBlock.appendChild(refHead);
+
+    group.variants.forEach(function (v) {
+      if (!variantLayers[v.osmId]) return;
+      var row = document.createElement('label');
+      row.className = 'vis-variant';
+      row.dataset.osmId = String(v.osmId);
+      row.dataset.search = [v.ref, v.from, v.to, v.description, v.name].join(' ').toLowerCase();
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!visibility[v.osmId];
+      if (cb.checked) setVariantVisible(v.osmId, true);
+
+      var text = document.createElement('div');
+      text.className = 'vis-variant-text';
+      text.innerHTML = dirLabelHtml(v.directionLabel) +
+        '<strong>' + esc(v.from) + ' → ' + esc(v.to) + '</strong>' +
+        (v.description ? '<br><span style="color:var(--muted)">' + esc(v.description) + '</span>' : '');
+
+      row.appendChild(cb);
+      row.appendChild(text);
+      refBlock.appendChild(row);
+
+      cb.addEventListener('change', function () {
+        setVariantVisible(v.osmId, cb.checked);
+        updateRefCheckbox(refCb, group);
+      });
+      row.addEventListener('click', function (e) {
+        if (e.target === cb) return;
+        selectVariant(v.osmId);
+        if (!cb.checked) { cb.checked = true; setVariantVisible(v.osmId, true); updateRefCheckbox(refCb, group); }
+      });
+    });
+
+    refCb.addEventListener('change', function () {
+      group.variants.forEach(function (v) {
+        if (variantLayers[v.osmId]) setVariantVisible(v.osmId, refCb.checked);
+      });
+      refBlock.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
+    });
+
+    refHead.addEventListener('click', function (e) {
+      if (e.target !== refCb) { refCb.checked = !refCb.checked; refCb.dispatchEvent(new Event('change')); }
+    });
+
+    visList.appendChild(refBlock);
+  });
+
+  function updateRefCheckbox(refCb, group) {
+    var checked = group.variants.filter(function (v) { return variantLayers[v.osmId] && variantLayers[v.osmId].visible; }).length;
+    refCb.checked = checked === group.variants.length;
+    refCb.indeterminate = checked > 0 && checked < group.variants.length;
+  }
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = visList.querySelector('[data-ref="' + group.ref.replace(/"/g, '') + '"]');
+    if (!refBlock) return;
+    var refCb = refBlock.querySelector('.vis-ref-head input');
+    updateRefCheckbox(refCb, group);
+  });
+
+  document.getElementById('vis-all').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), true); });
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = true; c.indeterminate = false; });
+  });
+  document.getElementById('vis-none').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), false); });
+    selectedOsmId = null;
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; c.indeterminate = false; });
+    refreshAllStyles();
+  });
+  document.getElementById('fit-visible').addEventListener('click', function () {
+    var bounds = L.latLngBounds([]);
+    Object.values(variantLayers).forEach(function (e) {
+      if (e.visible && e.line) e.line.getLatLngs().forEach(function (ll) {
+        if (Array.isArray(ll[0])) ll.forEach(function (p) { bounds.extend(p); });
+        else bounds.extend(ll);
+      });
+    });
+    if (bounds.isValid()) overviewMap.fitBounds(bounds, { padding: [32, 32] });
+  });
+
+  overviewMap.on('click', function () {
+    selectedOsmId = null;
+    document.querySelectorAll('.vis-variant.selected').forEach(function (el) { el.classList.remove('selected'); });
+    refreshAllStyles();
+  });
+
+  var container = document.getElementById('routes-container');
+  REPORT.refGroups.forEach(function (group) {
+    var card = document.createElement('article');
+    card.className = 'route-card';
+    card.dataset.ref = group.ref;
+
+    var header = document.createElement('div');
+    header.className = 'route-header';
+    header.innerHTML =
+      '<span class="route-badge">' + esc(group.ref) + '</span>' +
+      '<span class="route-title">' + esc(group.routeLongName || group.ref) + '</span>' +
+      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>';
+    card.appendChild(header);
+
+    var body = document.createElement('div');
+    body.className = 'route-body';
+    var grid = document.createElement('div');
+    grid.className = 'route-grid';
+
+    var mapDiv = document.createElement('div');
+    mapDiv.className = 'route-map';
+    grid.appendChild(mapDiv);
+
+    var variantsCol = document.createElement('div');
+    group.variants.forEach(function (v) {
+      var block = document.createElement('div');
+      block.className = 'variant-block';
+      block.dataset.osmId = String(v.osmId);
+      block.dataset.search = [v.ref, v.name, v.from, v.to, v.description].join(' ').toLowerCase();
+
+      var statusCls = v.status === 'ok' ? 'status-ok' : 'status-err';
+      var statusTxt = v.status === 'ok' ? '✅ OK' : '❌ ' + esc(v.errorMessage);
+
+      block.innerHTML =
+        '<h4>' + dirLabelHtml(v.directionLabel) + esc(v.from) + ' → ' + esc(v.to) + '</h4>' +
+        '<div class="variant-links">' +
+          '<a href="' + v.osmUrl + '" target="_blank" rel="noopener">OSM #' + v.osmId + '</a>' +
+          '<a href="#" class="show-on-map">Ver en mapa</a>' +
+        '</div>' +
+        '<div class="route-meta">' + esc(v.name) + '</div>' +
+        (v.description ? '<div class="route-meta">Variante: ' + esc(v.description) + '</div>' : '') +
+        '<div class="route-meta ' + statusCls + '">' + statusTxt + ' · ' + v.stopCount + ' paradas</div>' +
+        (v.stops.length ? '<ol class="stops-list">' + v.stops.map(function(s){ return '<li>' + esc(s.name) + '</li>'; }).join('') + '</ol>' : '');
+
+      var valDiv = document.createElement('div');
+      valDiv.className = 'validation';
+      valDiv.innerHTML =
+        '<label>Estado de validación</label>' +
+        '<div class="validation-row">' +
+          '<button type="button" data-status="ok">✓ Correcta</button>' +
+          '<button type="button" data-status="fix">⚠ Corregir</button>' +
+          '<button type="button" data-status="reject">✗ No es nuestra</button>' +
+        '</div>' +
+        '<label>Observaciones</label>' +
+        '<textarea placeholder="Detalle de correcciones…"></textarea>';
+
+      var saved = validation[v.osmId] || {};
+      valDiv.querySelectorAll('[data-status]').forEach(function (btn) {
+        if (saved.status === btn.dataset.status) btn.classList.add('active');
+        btn.addEventListener('click', function () {
+          valDiv.querySelectorAll('[data-status]').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          validation[v.osmId] = validation[v.osmId] || {};
+          validation[v.osmId].status = btn.dataset.status;
+          validation[v.osmId].updatedAt = new Date().toISOString();
+          saveValidation(validation);
+        });
+      });
+      var notes = valDiv.querySelector('textarea');
+      notes.value = saved.notes || '';
+      notes.addEventListener('input', function () {
+        validation[v.osmId] = validation[v.osmId] || {};
+        validation[v.osmId].notes = notes.value;
+        validation[v.osmId].updatedAt = new Date().toISOString();
+        saveValidation(validation);
+      });
+
+      block.appendChild(valDiv);
+      block.querySelector('.show-on-map').addEventListener('click', function (e) {
+        e.preventDefault();
+        setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+        document.getElementById('overview-map').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      variantsCol.appendChild(block);
+    });
+
+    grid.appendChild(variantsCol);
+    body.appendChild(grid);
+    card.appendChild(body);
+    container.appendChild(card);
+
+    header.addEventListener('click', function () {
+      card.classList.toggle('open');
+      if (card.classList.contains('open') && !routeMaps[group.ref]) initRefMap(group, mapDiv);
+    });
+  });
+
+  function initRefMap(group, el) {
+    var map = L.map(el, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(map);
+    var bounds = L.latLngBounds([]);
+    var hues = ['#2563eb','#dc2626','#16a34a','#9333ea','#d97706','#0891b2'];
+    group.variants.forEach(function (v, i) {
+      if (!v.coordinates.length) return;
+      var color = hues[i % hues.length];
+      var latlngs = coordsToLatLngs(v.coordinates);
+      L.polyline(latlngs, { color: color, weight: 5 }).bindPopup(buildPopup(v)).addTo(map);
+      addDirectionArrow(map, latlngs, color);
+      latlngs.forEach(function (ll) { bounds.extend(ll); });
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], { radius: STOP_RADIUS, color: color, fillOpacity: 0.7, weight: 1 })
+          .bindPopup(esc(s.name)).addTo(map);
+      });
+    });
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] });
+    routeMaps[group.ref] = map;
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  }
+
+  function applyFilters() {
+    var q = document.getElementById('search').value.toLowerCase().trim();
+    var refFilter = document.getElementById('filter-ref').value;
+    document.querySelectorAll('.route-card').forEach(function (card) {
+      var ref = card.dataset.ref;
+      var visible = !refFilter || ref === refFilter;
+      if (visible && q) {
+        visible = false;
+        card.querySelectorAll('.variant-block').forEach(function (vb) {
+          var match = vb.dataset.search.indexOf(q) >= 0;
+          vb.style.display = match ? '' : 'none';
+          if (match) visible = true;
+        });
+      } else {
+        card.querySelectorAll('.variant-block').forEach(function (vb) { vb.style.display = ''; });
+      }
+      card.classList.toggle('hidden', !visible);
+    });
+    document.querySelectorAll('.vis-ref-group').forEach(function (rg) {
+      var ref = rg.dataset.ref;
+      var show = !refFilter || ref === refFilter;
+      if (show && q) {
+        var any = false;
+        rg.querySelectorAll('.vis-variant').forEach(function (row) {
+          var match = row.dataset.search.indexOf(q) >= 0;
+          row.style.display = match ? '' : 'none';
+          if (match) any = true;
+        });
+        rg.style.display = any ? '' : 'none';
+      } else {
+        rg.style.display = show ? '' : 'none';
+        rg.querySelectorAll('.vis-variant').forEach(function (row) { row.style.display = ''; });
+      }
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('filter-ref').addEventListener('change', applyFilters);
+
+  function updateProgress() {
+    var total = 0, done = 0;
+    REPORT.refGroups.forEach(function (g) {
+      g.variants.forEach(function (v) {
+        total++;
+        if (validation[v.osmId] && validation[v.osmId].status) done++;
+      });
+    });
+    document.getElementById('progress').textContent = done + ' / ' + total + ' validadas';
+  }
+
+  document.getElementById('export-json').addEventListener('click', function () {
+    var payload = {
+      slug: REPORT.slug, operator: REPORT.operator, cityName: REPORT.cityName,
+      exportedAt: new Date().toISOString(), validations: validation,
+      routes: REPORT.refGroups.flatMap(function (g) {
+        return g.variants.map(function (v) {
+          return { osmId: v.osmId, ref: v.ref, from: v.from, to: v.to, direction: v.directionLabel, validation: validation[v.osmId] || null };
+        });
+      })
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'validacion-' + REPORT.slug + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  refreshAllStyles();
+  updateProgress();
+
+  function invalidateMap() {
+    setTimeout(function () { overviewMap.invalidateSize(); }, 50);
+  }
+
+  function toggleSidebar() {
+    var sb = document.getElementById('map-sidebar');
+    sb.classList.toggle('collapsed');
+    invalidateMap();
+  }
+
+  document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
+  document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
+  window.addEventListener('resize', invalidateMap);
+  invalidateMap();
+})();
+  </script>
+</body>
+</html>

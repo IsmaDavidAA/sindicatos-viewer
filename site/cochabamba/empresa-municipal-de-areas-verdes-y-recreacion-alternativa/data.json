@@ -1,0 +1,178 @@
+{
+  "slug": "empresa-municipal-de-areas-verdes-y-recreacion-alternativa",
+  "operator": "Empresa Municipal de Áreas Verdes y Recreación Alternativa",
+  "cityName": "cochabamba",
+  "generatedAt": "2026-05-30T19:13:11.079Z",
+  "stats": {
+    "totalVariants": 2,
+    "uniqueRefs": 1,
+    "errors": 0,
+    "totalStops": 0
+  },
+  "refGroups": [
+    {
+      "ref": "Teleférico",
+      "gtfsRouteId": "",
+      "routeColor": "888888",
+      "routeLongName": "Teleferico Teleférico",
+      "variants": [
+        {
+          "osmId": 6925237,
+          "ref": "Teleférico",
+          "name": "Teleferico Teleférico: Cristo de la Concordia → Parque de la Autonomía",
+          "from": "Cristo de la Concordia",
+          "to": "Parque de la Autonomía",
+          "description": "",
+          "tripHeadsign": "Parque de la Autonomía",
+          "routeType": "bus",
+          "gtfsRouteId": "",
+          "routeColor": "888888",
+          "stopCount": 0,
+          "stops": [],
+          "coordinates": [
+            [
+              -66.1416801,
+              -17.3885364
+            ],
+            [
+              -66.1415639,
+              -17.3884622
+            ],
+            [
+              -66.141482,
+              -17.3884103
+            ],
+            [
+              -66.1408644,
+              -17.38805
+            ],
+            [
+              -66.1398564,
+              -17.3874474
+            ],
+            [
+              -66.1396307,
+              -17.3873207
+            ],
+            [
+              -66.1392144,
+              -17.3871051
+            ],
+            [
+              -66.1380019,
+              -17.3863831
+            ],
+            [
+              -66.1375645,
+              -17.3861327
+            ],
+            [
+              -66.1371988,
+              -17.3859011
+            ],
+            [
+              -66.1368198,
+              -17.3856876
+            ],
+            [
+              -66.1360739,
+              -17.3851971
+            ],
+            [
+              -66.135865,
+              -17.3850846
+            ],
+            [
+              -66.1357091,
+              -17.3850051
+            ]
+          ],
+          "osmUrl": "https://www.openstreetmap.org/relation/6925237",
+          "status": "ok",
+          "errorMessage": "",
+          "fee": "yes",
+          "onDemand": "",
+          "directionLabel": "ida"
+        },
+        {
+          "osmId": 6925236,
+          "ref": "Teleférico",
+          "name": "Teleferico Teleférico: Parque de la Autonomía → Cristo de la Concordia",
+          "from": "Parque de la Autonomía",
+          "to": "Cristo de la Concordia",
+          "description": "",
+          "tripHeadsign": "Cristo de la Concordia",
+          "routeType": "bus",
+          "gtfsRouteId": "",
+          "routeColor": "888888",
+          "stopCount": 0,
+          "stops": [],
+          "coordinates": [
+            [
+              -66.1416801,
+              -17.3885364
+            ],
+            [
+              -66.1415639,
+              -17.3884622
+            ],
+            [
+              -66.141482,
+              -17.3884103
+            ],
+            [
+              -66.1408644,
+              -17.38805
+            ],
+            [
+              -66.1398564,
+              -17.3874474
+            ],
+            [
+              -66.1396307,
+              -17.3873207
+            ],
+            [
+              -66.1392144,
+              -17.3871051
+            ],
+            [
+              -66.1380019,
+              -17.3863831
+            ],
+            [
+              -66.1375645,
+              -17.3861327
+            ],
+            [
+              -66.1371988,
+              -17.3859011
+            ],
+            [
+              -66.1368198,
+              -17.3856876
+            ],
+            [
+              -66.1360739,
+              -17.3851971
+            ],
+            [
+              -66.135865,
+              -17.3850846
+            ],
+            [
+              -66.1357091,
+              -17.3850051
+            ]
+          ],
+          "osmUrl": "https://www.openstreetmap.org/relation/6925236",
+          "status": "ok",
+          "errorMessage": "",
+          "fee": "yes",
+          "onDemand": "",
+          "directionLabel": "vuelta"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Cotapachi — Validación de rutas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --bg: #f4f6f8; --card: #fff; --text: #1a1a2e; --muted: #5c6370;
+      --accent: #2563eb; --accent-hover: #1d4ed8; --highlight: #f59e0b;
+      --ok: #16a34a; --warn: #d97706; --err: #dc2626; --border: #e2e8f0;
+      --dim: #cbd5e1; --ida: #2563eb; --vuelta: #9333ea;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+      display: flex; flex-direction: column;
+    }
+    .top-chrome {
+      flex-shrink: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      z-index: 600;
+    }
+    .top-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: #fff;
+    }
+    .top-row h1 { margin: 0; font-size: 1.05rem; font-weight: 600; flex: 1; min-width: 10rem; }
+    .top-meta { font-size: 0.78rem; opacity: 0.9; white-space: nowrap; }
+    .stats { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .stat { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.75rem; white-space: nowrap; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      align-items: center;
+      background: var(--card);
+    }
+    .toolbar input, .toolbar select, .toolbar button {
+      font: inherit; padding: 0.35rem 0.55rem; border: 1px solid var(--border);
+      border-radius: 6px; background: #fff; font-size: 0.85rem;
+    }
+    .toolbar input[type=search] { flex: 1; min-width: 8rem; max-width: 16rem; }
+    .toolbar button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+    .toolbar button:hover { background: var(--accent-hover); }
+    .toolbar button.secondary { background: #fff; color: var(--text); border-color: var(--border); }
+    .toolbar button.icon-btn { padding: 0.35rem 0.6rem; min-width: 2rem; }
+    .progress-bar { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .map-workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      height: calc(100vh - 6.5rem);
+      max-height: calc(100vh - 6.5rem);
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .sidebar-toggle {
+      display: none;
+      position: absolute; top: 0.5rem; left: 0.5rem; z-index: 450;
+      font: inherit; font-size: 0.8rem; padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: rgba(255,255,255,0.95); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    .map-sidebar {
+      width: 300px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      height: 100%; min-height: 0;
+      background: #fafbfc;
+      transition: transform 0.2s ease, width 0.2s ease;
+      z-index: 440;
+    }
+    .map-sidebar.collapsed { width: 0; overflow: hidden; border-right: none; }
+    .map-sidebar-head { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0; }
+    .map-sidebar-head h2 { margin: 0 0 0.3rem; font-size: 0.88rem; }
+    .map-sidebar-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .map-sidebar-actions button {
+      font: inherit; font-size: 0.72rem; padding: 0.22rem 0.45rem;
+      border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer;
+    }
+    .map-sidebar-actions button:hover { background: #e2e8f0; }
+    .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
+    .vis-ref-group { border-bottom: 1px solid var(--border); }
+    .vis-ref-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; background: #fafbfc; cursor: pointer; }
+    .vis-ref-head input { margin: 0; }
+    .vis-variant { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem 0.75rem 0.3rem 1.15rem; font-size: 0.76rem; cursor: pointer; border-left: 3px solid transparent; }
+    .vis-variant:hover { background: #f8fafc; }
+    .vis-variant.selected { background: #fffbeb; border-left-color: var(--highlight); }
+    .vis-variant input { margin-top: 0.12rem; flex-shrink: 0; }
+    .vis-variant-text { flex: 1; min-width: 0; }
+    .vis-variant-text strong { display: block; font-weight: 500; font-size: 0.78rem; }
+    .dir-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 0.08rem 0.3rem; border-radius: 4px; margin-right: 0.2rem; }
+    .dir-ida { background: #dbeafe; color: var(--ida); }
+    .dir-vuelta { background: #ede9fe; color: var(--vuelta); }
+    .dir-unico { background: #f1f5f9; color: var(--muted); }
+    .map-main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0; }
+    .map-main-head {
+      padding: 0.35rem 0.75rem; font-size: 0.78rem; color: var(--muted);
+      border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0;
+    }
+    .map-wrap { position: relative; flex: 1; min-height: 0; }
+    #overview-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-empty-hint {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(255,255,255,0.94); padding: 0.65rem 1rem; border-radius: 8px;
+      font-size: 0.85rem; color: var(--muted); pointer-events: none; z-index: 400;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+    .dir-arrow-icon { background: none !important; border: none !important; font-size: 14px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 4px #fff; }
+    .validation-panel {
+      flex-shrink: 0;
+      max-width: 1200px; width: 100%; margin: 0 auto;
+      padding: 1.25rem 1rem 2rem;
+    }
+    .validation-panel > h2 { margin: 0 0 1rem; font-size: 1.1rem; color: var(--text); }
+    .route-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+    .route-card.hidden { display: none; }
+    .route-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.75rem 1rem; cursor: pointer; user-select: none; }
+    .route-header:hover { background: #f8fafc; }
+    .route-badge { font-weight: 700; font-size: 1.1rem; color: var(--accent); min-width: 3rem; }
+    .route-title { flex: 1; font-size: 0.95rem; }
+    .route-meta { font-size: 0.8rem; color: var(--muted); }
+    .route-body { display: none; border-top: 1px solid var(--border); }
+    .route-card.open .route-body { display: block; }
+    .route-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; }
+    @media (max-width: 768px) { .route-grid { grid-template-columns: 1fr; } }
+    .route-map { height: 260px; border-radius: 8px; border: 1px solid var(--border); }
+    .variant-block { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .variant-block:last-child { margin-bottom: 0; }
+    .variant-block h4 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+    .variant-links a { color: var(--accent); font-size: 0.85rem; margin-right: 1rem; }
+    .validation { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); }
+    .validation label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .validation-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+    .validation-row button { font: inherit; font-size: 0.8rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; cursor: pointer; }
+    .validation-row button.active[data-status="ok"] { background: #dcfce7; border-color: var(--ok); color: var(--ok); }
+    .validation-row button.active[data-status="fix"] { background: #fef3c7; border-color: var(--warn); color: var(--warn); }
+    .validation-row button.active[data-status="reject"] { background: #fee2e2; border-color: var(--err); color: var(--err); }
+    .validation textarea { width: 100%; min-height: 2.5rem; font: inherit; font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+    .stops-list { max-height: 180px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem; }
+    footer.app-footer { flex-shrink: 0; text-align: center; padding: 0.75rem; font-size: 0.75rem; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
+    .status-ok { color: var(--ok); }
+    .status-err { color: var(--err); }
+    @media (max-width: 900px) {
+      .map-workspace { height: calc(100vh - 7rem); max-height: calc(100vh - 7rem); }
+      .sidebar-toggle { display: block; }
+      .map-sidebar {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        box-shadow: 4px 0 16px rgba(0,0,0,0.15);
+      }
+      .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-chrome">
+    <div class="top-row">
+      <h1>Cotapachi</h1>
+      <span class="top-meta">cochabamba · 2026-05-30</span>
+      <div class="stats">
+        <span class="stat">2 relaciones</span>
+        <span class="stat">1 líneas</span>
+        <span class="stat">0 errores</span>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar ref, origen, destino…" aria-label="Buscar rutas">
+      <select id="filter-ref" aria-label="Filtrar por línea">
+        <option value="">Todas las líneas</option>
+        <option value="Cotapachi">Cotapachi (2)</option>
+      </select>
+      <button type="button" class="secondary icon-btn" id="toggle-sidebar" title="Mostrar/ocultar panel de rutas">☰</button>
+      <button type="button" class="secondary" id="export-json">Exportar</button>
+      <span class="progress-bar" id="progress">0 / 0 validadas</span>
+    </div>
+  </div>
+
+  <div class="map-workspace">
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle-mobile">☰ Rutas</button>
+    <aside class="map-sidebar" id="map-sidebar">
+      <div class="map-sidebar-head">
+        <h2>Rutas en mapa</h2>
+        <div class="map-sidebar-actions">
+          <button type="button" id="vis-all">Todas</button>
+          <button type="button" id="vis-none">Ninguna</button>
+          <button type="button" id="fit-visible">Ajustar</button>
+        </div>
+      </div>
+      <div class="route-visibility-list" id="visibility-list"></div>
+    </aside>
+    <div class="map-main">
+      <div class="map-main-head" id="map-status">Seleccione rutas · clic en línea para resaltar</div>
+      <div class="map-wrap">
+        <div id="overview-map"></div>
+        <div class="map-empty-hint" id="map-hint">Marque rutas en el panel ← para verlas en el mapa</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="validation-panel">
+    <h2>Detalle y validación por ruta</h2>
+    <div id="routes-container"></div>
+  </section>
+
+  <footer class="app-footer">
+    Generado por <a href="https://www.trufi-association.org/" target="_blank" rel="noopener">Trufi Association</a> · observaciones guardadas localmente
+  </footer>
+
+  <script id="report-data" type="application/json">{"slug":"cotapachi","operator":"Cotapachi","cityName":"cochabamba","generatedAt":"2026-05-30T19:13:10.994Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":41},"refGroups":[{"ref":"Cotapachi","gtfsRouteId":138,"routeColor":"888888","routeLongName":"Trufi Cotapachi","variants":[{"osmId":20748891,"ref":"Cotapachi","name":"Trufi Cotapachi: 14 de septiembre → Cotapachi","from":"14 de septiembre","to":"Cotapachi","description":"","tripHeadsign":"Cotapachi","routeType":"bus","gtfsRouteId":138,"routeColor":"888888","stopCount":20,"stops":[{"id":617337160,"name":"Calle 14 de Septiembre y Avenida General Camacho","lat":-17.3979763,"lon":-66.2781143},{"id":781813856,"name":"Calle 14 de Septiembre","lat":-17.3981793,"lon":-66.2768756},{"id":11335354962,"name":"Calle 14 de Septiembre","lat":-17.3983906,"lon":-66.2751633},{"id":781813445,"name":"Calle 14 de Septiembre","lat":-17.3984352,"lon":-66.2747622},{"id":617337163,"name":"Calle 14 de Septiembre y Avenida Ferrocarril","lat":-17.398559,"lon":-66.2737061},{"id":7929849788,"name":"Calle 14 de Septiembre","lat":-17.3987311,"lon":-66.2720575},{"id":783871090,"name":"Calle 14 de Septiembre","lat":-17.3988302,"lon":-66.2707859},{"id":785869328,"name":"Calle 14 de Septiembre","lat":-17.3988661,"lon":-66.2699439},{"id":4509962949,"name":"Calle 14 de Septiembre","lat":-17.3989303,"lon":-66.2684506},{"id":785868311,"name":"Calle 14 de Septiembre","lat":-17.3989701,"lon":-66.2680596},{"id":4509962957,"name":"Calle 14 de Septiembre","lat":-17.3990218,"lon":-66.2671887},{"id":785868123,"name":"Tranvía Verde y Calle 14 de Septiembre","lat":-17.3990586,"lon":-66.2667422},{"id":7171092798,"name":"Calle 14 de Septiembre","lat":-17.399092,"lon":-66.2662291},{"id":10105429637,"name":"Innominada","lat":-17.3992315,"lon":-66.2652599},{"id":785868453,"name":"Innominada","lat":-17.4000016,"lon":-66.2654405},{"id":785869597,"name":"Innominada","lat":-17.4008207,"lon":-66.2656069},{"id":4571009850,"name":"Innominada","lat":-17.4018307,"lon":-66.2656318},{"id":10105429698,"name":"Innominada","lat":-17.4033463,"lon":-66.2657874},{"id":4571009854,"name":"Innominada","lat":-17.4045652,"lon":-66.265771},{"id":786662101,"name":"Innominada","lat":-17.4090701,"lon":-66.2651842}],"coordinates":[[-66.2781143,-17.3979763],[-66.2780651,-17.3980198],[-66.2768756,-17.3981793],[-66.2758293,-17.3983165],[-66.2751633,-17.3983906],[-66.2749845,-17.3984105],[-66.2747622,-17.3984352],[-66.2737957,-17.3985485],[-66.2737061,-17.398559],[-66.2726546,-17.3986785],[-66.2720575,-17.3987311],[-66.271461,-17.3987743],[-66.2707859,-17.3988302],[-66.2700985,-17.3988691],[-66.2699439,-17.3988661],[-66.2686381,-17.3989289],[-66.2684506,-17.3989303],[-66.2683763,-17.3989377],[-66.2680596,-17.3989701],[-66.2671887,-17.3990218],[-66.2668568,-17.3990438],[-66.2667422,-17.3990586],[-66.2664857,-17.3990753],[-66.2662291,-17.399092],[-66.2652233,-17.3991673],[-66.2652599,-17.3992315],[-66.2652873,-17.3992958],[-66.2654405,-17.4000016],[-66.2655104,-17.4003008],[-66.2656069,-17.4008207],[-66.2656136,-17.4010919],[-66.2656318,-17.4018307],[-66.2657626,-17.4029233],[-66.2657874,-17.4033463],[-66.265784,-17.4036926],[-66.265771,-17.4045652],[-66.2657658,-17.4057442],[-66.26571,-17.4090384],[-66.2651842,-17.4090701]],"osmUrl":"https://www.openstreetmap.org/relation/20748891","status":"ok","errorMessage":"","fee":"","onDemand":"","directionLabel":"ida","directionId":1},{"osmId":20748881,"ref":"Cotapachi","name":"Trufi Cotapachi: Cotapachi → 14 de septiembre","from":"Cotapachi","to":"14 de septiembre","description":"","tripHeadsign":"14 de septiembre","routeType":"bus","gtfsRouteId":138,"routeColor":"888888","stopCount":21,"stops":[{"id":786662049,"name":"Innominada","lat":-17.4090384,"lon":-66.26571},{"id":4571009854,"name":"Innominada","lat":-17.4045652,"lon":-66.265771},{"id":10105429698,"name":"Innominada","lat":-17.4033463,"lon":-66.2657874},{"id":4571009850,"name":"Innominada","lat":-17.4018307,"lon":-66.2656318},{"id":785869597,"name":"Innominada","lat":-17.4008207,"lon":-66.2656069},{"id":785868453,"name":"Innominada","lat":-17.4000016,"lon":-66.2654405},{"id":9281030968,"name":"Innominada","lat":-17.3992958,"lon":-66.2652873},{"id":785868238,"name":"Calle 14 de Septiembre","lat":-17.3991673,"lon":-66.2652233},{"id":10105429657,"name":"Calle 14 de Septiembre","lat":-17.3990103,"lon":-66.2664383},{"id":7059258035,"name":"Calle 14 de Septiembre","lat":-17.3989942,"lon":-66.2666779},{"id":7171092796,"name":"Calle 14 de Septiembre","lat":-17.3989052,"lon":-66.2680539},{"id":7059258027,"name":"Calle 14 de Septiembre","lat":-17.3988713,"lon":-66.26845},{"id":7059258023,"name":"Calle 14 de Septiembre","lat":-17.3987972,"lon":-66.269947},{"id":783869751,"name":"Calle 14 de Septiembre","lat":-17.3987605,"lon":-66.2707581},{"id":783870666,"name":"Calle 14 de Septiembre","lat":-17.3986567,"lon":-66.2720493},{"id":617337162,"name":"Avenida Ferrocarril y Calle 14 de Septiembre","lat":-17.398483,"lon":-66.2736945},{"id":617337161,"name":"Avenida Ferrocarril y Calle 14 de Septiembre","lat":-17.3984739,"lon":-66.2737834},{"id":780227210,"name":"Calle Fructuoso Mercado y Calle 14 de Septiembre","lat":-17.3982375,"lon":-66.2758245},{"id":9181753377,"name":"Calle 14 de Septiembre","lat":-17.3980296,"lon":-66.2774344},{"id":617337160,"name":"Calle 14 de Septiembre y Avenida General Camacho","lat":-17.3979763,"lon":-66.2781143},{"id":617337159,"name":"Calle Pacheco y Calle 14 de Septiembre","lat":-17.3978145,"lon":-66.2793361}],"coordinates":[[-66.26571,-17.4090384],[-66.2657658,-17.4057442],[-66.265771,-17.4045652],[-66.265784,-17.4036926],[-66.2657874,-17.4033463],[-66.2657626,-17.4029233],[-66.2656318,-17.4018307],[-66.2656136,-17.4010919],[-66.2656069,-17.4008207],[-66.2655104,-17.4003008],[-66.2654405,-17.4000016],[-66.2652873,-17.3992958],[-66.2652599,-17.3992315],[-66.2652233,-17.3991673],[-66.265169,-17.399093],[-66.2664383,-17.3990103],[-66.2665233,-17.3990056],[-66.2666779,-17.3989942],[-66.267189,-17.3989612],[-66.2680539,-17.3989052],[-66.2683759,-17.398877],[-66.26845,-17.3988713],[-66.268642,-17.398857],[-66.269947,-17.3987972],[-66.2700834,-17.3988006],[-66.2707581,-17.3987605],[-66.2714466,-17.3986976],[-66.2720493,-17.3986567],[-66.2726374,-17.3986102],[-66.2736945,-17.398483],[-66.2737834,-17.3984739],[-66.274745,-17.3983554],[-66.2758245,-17.3982375],[-66.2768638,-17.3981048],[-66.2774344,-17.3980296],[-66.2780489,-17.3979485],[-66.2781143,-17.3979763],[-66.2778947,-17.3968388],[-66.2791584,-17.3966776],[-66.2793361,-17.3978145]],"osmUrl":"https://www.openstreetmap.org/relation/20748881","status":"ok","errorMessage":"","fee":"","onDemand":"","directionLabel":"vuelta","directionId":0}]}]}</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+(function () {
+  const REPORT = JSON.parse(document.getElementById('report-data').textContent);
+  const STORAGE_KEY = 'trufi-validation-' + REPORT.slug;
+  const VIS_KEY = 'trufi-vis-' + REPORT.slug;
+
+  const HIGHLIGHT_COLOR = '#f59e0b';
+  const DIM_COLOR = '#94a3b8';
+  const STOP_RADIUS = 2;
+  const STOP_RADIUS_SELECTED = 4;
+
+  function loadValidation() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveValidation(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    updateProgress();
+  }
+  function loadVisibility() {
+    try { return JSON.parse(localStorage.getItem(VIS_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveVisibility(data) {
+    localStorage.setItem(VIS_KEY, JSON.stringify(data));
+  }
+
+  const validation = loadValidation();
+  const visibility = loadVisibility();
+  let selectedOsmId = null;
+
+  const overviewMap = L.map('overview-map', { scrollWheelZoom: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(overviewMap);
+  overviewMap.setView([-17.39, -66.16], 12);
+
+  const variantLayers = {};
+  const routeMaps = {};
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  }
+  function hexColor(c) { return c && String(c).length >= 3 ? '#' + String(c).replace('#','') : '#64748b'; }
+  function coordsToLatLngs(coords) {
+    return coords.map(function (c) { return [c[1], c[0]]; });
+  }
+  function dirLabelHtml(label) {
+    if (label === 'ida') return '<span class="dir-badge dir-ida">→ Ida</span>';
+    if (label === 'vuelta') return '<span class="dir-badge dir-vuelta">← Vuelta</span>';
+    return '<span class="dir-badge dir-unico">↔ Único</span>';
+  }
+  function dirLabelText(label) {
+    if (label === 'ida') return 'Ida';
+    if (label === 'vuelta') return 'Vuelta';
+    return 'Único';
+  }
+  function buildPopup(v) {
+    return dirLabelHtml(v.directionLabel) +
+      ' <strong>' + esc(v.ref) + '</strong><br>' +
+      esc(v.from) + ' → ' + esc(v.to) +
+      (v.description ? '<br><em>' + esc(v.description) + '</em>' : '') +
+      '<br><a href="' + v.osmUrl + '" target="_blank" rel="noopener">Ver en OSM</a>';
+  }
+  function addDirectionArrow(layerGroup, latlngs, color) {
+    if (latlngs.length < 2) return null;
+    var idx = Math.min(Math.floor(latlngs.length * 0.75), latlngs.length - 1);
+    var p1 = latlngs[Math.max(0, idx - 1)];
+    var p2 = latlngs[idx];
+    var angle = Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180 / Math.PI;
+    var marker = L.marker(p2, {
+      icon: L.divIcon({
+        className: 'dir-arrow-icon',
+        html: '<div style="transform:rotate(' + angle + 'deg);color:' + color + ';font-weight:bold">▶</div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      }),
+      interactive: false
+    });
+    marker.addTo(layerGroup);
+    return marker;
+  }
+
+  function styleVariant(osmId) {
+    var entry = variantLayers[osmId];
+    if (!entry || !entry.visible) return;
+    var v = entry.variant;
+    var isSelected = selectedOsmId === osmId;
+    var baseColor = hexColor(v.routeColor || entry.refColor);
+
+    if (isSelected) {
+      entry.line.setStyle({ color: HIGHLIGHT_COLOR, weight: 6, opacity: 1 });
+      if (entry.arrow) entry.arrow.setOpacity(1);
+    } else if (selectedOsmId !== null) {
+      entry.line.setStyle({ color: DIM_COLOR, weight: 3, opacity: 0.35 });
+      if (entry.arrow) entry.arrow.setOpacity(0.3);
+    } else {
+      entry.line.setStyle({ color: baseColor, weight: 4, opacity: 0.85 });
+      if (entry.arrow) entry.arrow.setOpacity(0.9);
+    }
+
+    entry.stops.clearLayers();
+    if (isSelected && v.stops && v.stops.length) {
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], {
+          radius: STOP_RADIUS_SELECTED,
+          color: HIGHLIGHT_COLOR,
+          fillColor: HIGHLIGHT_COLOR,
+          fillOpacity: 0.85,
+          weight: 1
+        }).bindPopup(esc(s.name)).addTo(entry.stops);
+      });
+    }
+  }
+
+  function refreshAllStyles() {
+    Object.keys(variantLayers).forEach(function (id) { styleVariant(Number(id)); });
+    var anyVisible = Object.values(variantLayers).some(function (e) { return e.visible; });
+    document.getElementById('map-hint').style.display = anyVisible ? 'none' : 'block';
+    var n = Object.values(variantLayers).filter(function (e) { return e.visible; }).length;
+    var status = n + ' ruta(s) visible(s)';
+    if (selectedOsmId && variantLayers[selectedOsmId]) {
+      var sv = variantLayers[selectedOsmId].variant;
+      status += ' · Seleccionada: ' + dirLabelText(sv.directionLabel) + ' ' + sv.from + ' → ' + sv.to;
+    }
+    document.getElementById('map-status').textContent = status;
+  }
+
+  function selectVariant(osmId) {
+    selectedOsmId = osmId;
+    document.querySelectorAll('.vis-variant').forEach(function (el) {
+      el.classList.toggle('selected', Number(el.dataset.osmId) === osmId);
+    });
+    refreshAllStyles();
+    var entry = variantLayers[osmId];
+    if (entry && entry.line) {
+      overviewMap.fitBounds(entry.line.getBounds(), { padding: [48, 48] });
+    }
+  }
+
+  function setVariantVisible(osmId, visible) {
+    var entry = variantLayers[osmId];
+    if (!entry) return;
+    entry.visible = visible;
+    visibility[osmId] = visible;
+    saveVisibility(visibility);
+
+    if (visible) {
+      entry.group.addTo(overviewMap);
+    } else {
+      overviewMap.removeLayer(entry.group);
+      if (selectedOsmId === osmId) selectedOsmId = null;
+    }
+    var cb = document.querySelector('.vis-variant[data-osm-id="' + osmId + '"] input');
+    if (cb) cb.checked = visible;
+    refreshAllStyles();
+  }
+
+  REPORT.refGroups.forEach(function (group) {
+    var refColor = hexColor(group.routeColor);
+
+    group.variants.forEach(function (v) {
+      if (!v.coordinates || !v.coordinates.length) return;
+
+      var latlngs = coordsToLatLngs(v.coordinates);
+      var groupLayer = L.layerGroup();
+      var stopsLayer = L.layerGroup();
+      var line = L.polyline(latlngs, { color: refColor, weight: 4, opacity: 0.85 });
+      line.bindPopup(buildPopup(v));
+      line.on('click', function (e) {
+        L.DomEvent.stopPropagation(e);
+        if (!variantLayers[v.osmId].visible) setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+      });
+      line.addTo(groupLayer);
+      var arrow = addDirectionArrow(groupLayer, latlngs, refColor);
+      stopsLayer.addTo(groupLayer);
+
+      variantLayers[v.osmId] = {
+        osmId: v.osmId,
+        ref: group.ref,
+        refColor: group.routeColor,
+        variant: v,
+        group: groupLayer,
+        line: line,
+        stops: stopsLayer,
+        arrow: arrow,
+        visible: false
+      };
+    });
+  });
+
+  var visList = document.getElementById('visibility-list');
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = document.createElement('div');
+    refBlock.className = 'vis-ref-group';
+    refBlock.dataset.ref = group.ref;
+
+    var refHead = document.createElement('div');
+    refHead.className = 'vis-ref-head';
+    var refCb = document.createElement('input');
+    refCb.type = 'checkbox';
+    refCb.title = 'Mostrar/ocultar línea ' + group.ref;
+    refHead.appendChild(refCb);
+    refHead.appendChild(document.createTextNode(' Línea ' + group.ref + ' (' + group.variants.length + ')'));
+    refBlock.appendChild(refHead);
+
+    group.variants.forEach(function (v) {
+      if (!variantLayers[v.osmId]) return;
+      var row = document.createElement('label');
+      row.className = 'vis-variant';
+      row.dataset.osmId = String(v.osmId);
+      row.dataset.search = [v.ref, v.from, v.to, v.description, v.name].join(' ').toLowerCase();
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!visibility[v.osmId];
+      if (cb.checked) setVariantVisible(v.osmId, true);
+
+      var text = document.createElement('div');
+      text.className = 'vis-variant-text';
+      text.innerHTML = dirLabelHtml(v.directionLabel) +
+        '<strong>' + esc(v.from) + ' → ' + esc(v.to) + '</strong>' +
+        (v.description ? '<br><span style="color:var(--muted)">' + esc(v.description) + '</span>' : '');
+
+      row.appendChild(cb);
+      row.appendChild(text);
+      refBlock.appendChild(row);
+
+      cb.addEventListener('change', function () {
+        setVariantVisible(v.osmId, cb.checked);
+        updateRefCheckbox(refCb, group);
+      });
+      row.addEventListener('click', function (e) {
+        if (e.target === cb) return;
+        selectVariant(v.osmId);
+        if (!cb.checked) { cb.checked = true; setVariantVisible(v.osmId, true); updateRefCheckbox(refCb, group); }
+      });
+    });
+
+    refCb.addEventListener('change', function () {
+      group.variants.forEach(function (v) {
+        if (variantLayers[v.osmId]) setVariantVisible(v.osmId, refCb.checked);
+      });
+      refBlock.querySelectorAll('.vis-variant input').forEach(function (c) { c.checked = refCb.checked; });
+    });
+
+    refHead.addEventListener('click', function (e) {
+      if (e.target !== refCb) { refCb.checked = !refCb.checked; refCb.dispatchEvent(new Event('change')); }
+    });
+
+    visList.appendChild(refBlock);
+  });
+
+  function updateRefCheckbox(refCb, group) {
+    var checked = group.variants.filter(function (v) { return variantLayers[v.osmId] && variantLayers[v.osmId].visible; }).length;
+    refCb.checked = checked === group.variants.length;
+    refCb.indeterminate = checked > 0 && checked < group.variants.length;
+  }
+  REPORT.refGroups.forEach(function (group) {
+    var refBlock = visList.querySelector('[data-ref="' + group.ref.replace(/"/g, '') + '"]');
+    if (!refBlock) return;
+    var refCb = refBlock.querySelector('.vis-ref-head input');
+    updateRefCheckbox(refCb, group);
+  });
+
+  document.getElementById('vis-all').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), true); });
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = true; c.indeterminate = false; });
+  });
+  document.getElementById('vis-none').addEventListener('click', function () {
+    Object.keys(variantLayers).forEach(function (id) { setVariantVisible(Number(id), false); });
+    selectedOsmId = null;
+    visList.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; c.indeterminate = false; });
+    refreshAllStyles();
+  });
+  document.getElementById('fit-visible').addEventListener('click', function () {
+    var bounds = L.latLngBounds([]);
+    Object.values(variantLayers).forEach(function (e) {
+      if (e.visible && e.line) e.line.getLatLngs().forEach(function (ll) {
+        if (Array.isArray(ll[0])) ll.forEach(function (p) { bounds.extend(p); });
+        else bounds.extend(ll);
+      });
+    });
+    if (bounds.isValid()) overviewMap.fitBounds(bounds, { padding: [32, 32] });
+  });
+
+  overviewMap.on('click', function () {
+    selectedOsmId = null;
+    document.querySelectorAll('.vis-variant.selected').forEach(function (el) { el.classList.remove('selected'); });
+    refreshAllStyles();
+  });
+
+  var container = document.getElementById('routes-container');
+  REPORT.refGroups.forEach(function (group) {
+    var card = document.createElement('article');
+    card.className = 'route-card';
+    card.dataset.ref = group.ref;
+
+    var header = document.createElement('div');
+    header.className = 'route-header';
+    header.innerHTML =
+      '<span class="route-badge">' + esc(group.ref) + '</span>' +
+      '<span class="route-title">' + esc(group.routeLongName || group.ref) + '</span>' +
+      '<span class="route-meta">' + group.variants.length + ' variantes · GTFS ' + group.gtfsRouteId + '</span>';
+    card.appendChild(header);
+
+    var body = document.createElement('div');
+    body.className = 'route-body';
+    var grid = document.createElement('div');
+    grid.className = 'route-grid';
+
+    var mapDiv = document.createElement('div');
+    mapDiv.className = 'route-map';
+    grid.appendChild(mapDiv);
+
+    var variantsCol = document.createElement('div');
+    group.variants.forEach(function (v) {
+      var block = document.createElement('div');
+      block.className = 'variant-block';
+      block.dataset.osmId = String(v.osmId);
+      block.dataset.search = [v.ref, v.name, v.from, v.to, v.description].join(' ').toLowerCase();
+
+      var statusCls = v.status === 'ok' ? 'status-ok' : 'status-err';
+      var statusTxt = v.status === 'ok' ? '✅ OK' : '❌ ' + esc(v.errorMessage);
+
+      block.innerHTML =
+        '<h4>' + dirLabelHtml(v.directionLabel) + esc(v.from) + ' → ' + esc(v.to) + '</h4>' +
+        '<div class="variant-links">' +
+          '<a href="' + v.osmUrl + '" target="_blank" rel="noopener">OSM #' + v.osmId + '</a>' +
+          '<a href="#" class="show-on-map">Ver en mapa</a>' +
+        '</div>' +
+        '<div class="route-meta">' + esc(v.name) + '</div>' +
+        (v.description ? '<div class="route-meta">Variante: ' + esc(v.description) + '</div>' : '') +
+        '<div class="route-meta ' + statusCls + '">' + statusTxt + ' · ' + v.stopCount + ' paradas</div>' +
+        (v.stops.length ? '<ol class="stops-list">' + v.stops.map(function(s){ return '<li>' + esc(s.name) + '</li>'; }).join('') + '</ol>' : '');
+
+      var valDiv = document.createElement('div');
+      valDiv.className = 'validation';
+      valDiv.innerHTML =
+        '<label>Estado de validación</label>' +
+        '<div class="validation-row">' +
+          '<button type="button" data-status="ok">✓ Correcta</button>' +
+          '<button type="button" data-status="fix">⚠ Corregir</button>' +
+          '<button type="button" data-status="reject">✗ No es nuestra</button>' +
+        '</div>' +
+        '<label>Observaciones</label>' +
+        '<textarea placeholder="Detalle de correcciones…"></textarea>';
+
+      var saved = validation[v.osmId] || {};
+      valDiv.querySelectorAll('[data-status]').forEach(function (btn) {
+        if (saved.status === btn.dataset.status) btn.classList.add('active');
+        btn.addEventListener('click', function () {
+          valDiv.querySelectorAll('[data-status]').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          validation[v.osmId] = validation[v.osmId] || {};
+          validation[v.osmId].status = btn.dataset.status;
+          validation[v.osmId].updatedAt = new Date().toISOString();
+          saveValidation(validation);
+        });
+      });
+      var notes = valDiv.querySelector('textarea');
+      notes.value = saved.notes || '';
+      notes.addEventListener('input', function () {
+        validation[v.osmId] = validation[v.osmId] || {};
+        validation[v.osmId].notes = notes.value;
+        validation[v.osmId].updatedAt = new Date().toISOString();
+        saveValidation(validation);
+      });
+
+      block.appendChild(valDiv);
+      block.querySelector('.show-on-map').addEventListener('click', function (e) {
+        e.preventDefault();
+        setVariantVisible(v.osmId, true);
+        selectVariant(v.osmId);
+        document.getElementById('overview-map').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      variantsCol.appendChild(block);
+    });
+
+    grid.appendChild(variantsCol);
+    body.appendChild(grid);
+    card.appendChild(body);
+    container.appendChild(card);
+
+    header.addEventListener('click', function () {
+      card.classList.toggle('open');
+      if (card.classList.contains('open') && !routeMaps[group.ref]) initRefMap(group, mapDiv);
+    });
+  });
+
+  function initRefMap(group, el) {
+    var map = L.map(el, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(map);
+    var bounds = L.latLngBounds([]);
+    var hues = ['#2563eb','#dc2626','#16a34a','#9333ea','#d97706','#0891b2'];
+    group.variants.forEach(function (v, i) {
+      if (!v.coordinates.length) return;
+      var color = hues[i % hues.length];
+      var latlngs = coordsToLatLngs(v.coordinates);
+      L.polyline(latlngs, { color: color, weight: 5 }).bindPopup(buildPopup(v)).addTo(map);
+      addDirectionArrow(map, latlngs, color);
+      latlngs.forEach(function (ll) { bounds.extend(ll); });
+      v.stops.forEach(function (s) {
+        L.circleMarker([s.lat, s.lon], { radius: STOP_RADIUS, color: color, fillOpacity: 0.7, weight: 1 })
+          .bindPopup(esc(s.name)).addTo(map);
+      });
+    });
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] });
+    routeMaps[group.ref] = map;
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  }
+
+  function applyFilters() {
+    var q = document.getElementById('search').value.toLowerCase().trim();
+    var refFilter = document.getElementById('filter-ref').value;
+    document.querySelectorAll('.route-card').forEach(function (card) {
+      var ref = card.dataset.ref;
+      var visible = !refFilter || ref === refFilter;
+      if (visible && q) {
+        visible = false;
+        card.querySelectorAll('.variant-block').forEach(function (vb) {
+          var match = vb.dataset.search.indexOf(q) >= 0;
+          vb.style.display = match ? '' : 'none';
+          if (match) visible = true;
+        });
+      } else {
+        card.querySelectorAll('.variant-block').forEach(function (vb) { vb.style.display = ''; });
+      }
+      card.classList.toggle('hidden', !visible);
+    });
+    document.querySelectorAll('.vis-ref-group').forEach(function (rg) {
+      var ref = rg.dataset.ref;
+      var show = !refFilter || ref === refFilter;
+      if (show && q) {
+        var any = false;
+        rg.querySelectorAll('.vis-variant').forEach(function (row) {
+          var match = row.dataset.search.indexOf(q) >= 0;
+          row.style.display = match ? '' : 'none';
+          if (match) any = true;
+        });
+        rg.style.display = any ? '' : 'none';
+      } else {
+        rg.style.display = show ? '' : 'none';
+        rg.querySelectorAll('.vis-variant').forEach(function (row) { row.style.display = ''; });
+      }
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('filter-ref').addEventListener('change', applyFilters);
+
+  function updateProgress() {
+    var total = 0, done = 0;
+    REPORT.refGroups.forEach(function (g) {
+      g.variants.forEach(function (v) {
+        total++;
+        if (validation[v.osmId] && validation[v.osmId].status) done++;
+      });
+    });
+    document.getElementById('progress').textContent = done + ' / ' + total + ' validadas';
+  }
+
+  document.getElementById('export-json').addEventListener('click', function () {
+    var payload = {
+      slug: REPORT.slug, operator: REPORT.operator, cityName: REPORT.cityName,
+      exportedAt: new Date().toISOString(), validations: validation,
+      routes: REPORT.refGroups.flatMap(function (g) {
+        return g.variants.map(function (v) {
+          return { osmId: v.osmId, ref: v.ref, from: v.from, to: v.to, direction: v.directionLabel, validation: validation[v.osmId] || null };
+        });
+      })
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'validacion-' + REPORT.slug + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  refreshAllStyles();
+  updateProgress();
+
+  function invalidateMap() {
+    setTimeout(function () { overviewMap.invalidateSize(); }, 50);
+  }
+
+  function toggleSidebar() {
+    var sb = document.getElementById('map-sidebar');
+    sb.classList.toggle('collapsed');
+    invalidateMap();
+  }
+
+  document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
+  document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
+  window.addEventListener('resize', invalidateMap);
+  invalidateMap();
+})();
+  </script>
+</body>
+</html>

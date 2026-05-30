@@ -1,0 +1,479 @@
+{
+  "cityName": "cochabamba",
+  "generatedAt": "2026-05-30T19:13:11.803Z",
+  "sindicatos": [
+    {
+      "slug": "asociacion-de-autotransporte-uspa-uspa",
+      "operator": "Asociación de autotransporte Uspa Uspa",
+      "urlPath": "asociacion-de-autotransporte-uspa-uspa/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 370
+      }
+    },
+    {
+      "slug": "asociacion-de-taxi-trufis-10-de-diciembre",
+      "operator": "Asociación de taxi trufis 10 de diciembre",
+      "urlPath": "asociacion-de-taxi-trufis-10-de-diciembre/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 500
+      }
+    },
+    {
+      "slug": "asociacion-de-taxi-trufis-1ro-de-mayo",
+      "operator": "Asociación de taxi trufis 1ro de mayo",
+      "urlPath": "asociacion-de-taxi-trufis-1ro-de-mayo/",
+      "stats": {
+        "totalVariants": 52,
+        "uniqueRefs": 8,
+        "errors": 0,
+        "totalStops": 8635
+      }
+    },
+    {
+      "slug": "asociacion-de-taxi-trufis-san-miguel",
+      "operator": "Asociación de taxi trufis San Miguel",
+      "urlPath": "asociacion-de-taxi-trufis-san-miguel/",
+      "stats": {
+        "totalVariants": 8,
+        "uniqueRefs": 2,
+        "errors": 0,
+        "totalStops": 1126
+      }
+    },
+    {
+      "slug": "asociacion-de-taxis-y-trufis-ati",
+      "operator": "Asociación de taxis y trufis ATI",
+      "urlPath": "asociacion-de-taxis-y-trufis-ati/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 220
+      }
+    },
+    {
+      "slug": "asociacion-de-taxis-y-trufis-cosmos",
+      "operator": "Asociación de taxis y trufis Cosmos",
+      "urlPath": "asociacion-de-taxis-y-trufis-cosmos/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 429
+      }
+    },
+    {
+      "slug": "asociacion-de-taxis-y-trufis-pucara",
+      "operator": "Asociación de taxis y trufis Pucara",
+      "urlPath": "asociacion-de-taxis-y-trufis-pucara/",
+      "stats": {
+        "totalVariants": 8,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 1402
+      }
+    },
+    {
+      "slug": "asociacion-de-transporte-integrado-de-servicio-publico-apote",
+      "operator": "Asociación de transporte integrado de servicio público Apote",
+      "urlPath": "asociacion-de-transporte-integrado-de-servicio-publico-apote/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 554
+      }
+    },
+    {
+      "slug": "asociacion-de-transporte-libre-mixto-oruro",
+      "operator": "Asociación de transporte libre mixto Oruro",
+      "urlPath": "asociacion-de-transporte-libre-mixto-oruro/",
+      "stats": {
+        "totalVariants": 10,
+        "uniqueRefs": 3,
+        "errors": 0,
+        "totalStops": 1084
+      }
+    },
+    {
+      "slug": "asociacion-de-transporte-mixto-renacer",
+      "operator": "Asociación de transporte mixto Renacer",
+      "urlPath": "asociacion-de-transporte-mixto-renacer/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 2,
+        "errors": 0,
+        "totalStops": 613
+      }
+    },
+    {
+      "slug": "asociacion-de-transporte-y-servicio-luz-urkupina",
+      "operator": "Asociación de transporte y servicio Luz Urkupiña",
+      "urlPath": "asociacion-de-transporte-y-servicio-luz-urkupina/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 265
+      }
+    },
+    {
+      "slug": "asociacion-mixta-de-transporte-y-servicios-chilimarca",
+      "operator": "Asociación mixta de transporte y servicios Chilimarca",
+      "urlPath": "asociacion-mixta-de-transporte-y-servicios-chilimarca/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 210
+      }
+    },
+    {
+      "slug": "cotapachi",
+      "operator": "Cotapachi",
+      "urlPath": "cotapachi/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 41
+      }
+    },
+    {
+      "slug": "default",
+      "operator": "default",
+      "urlPath": "default/",
+      "stats": {
+        "totalVariants": 7,
+        "uniqueRefs": 6,
+        "errors": 0,
+        "totalStops": 1063
+      }
+    },
+    {
+      "slug": "empresa-municipal-de-areas-verdes-y-recreacion-alternativa",
+      "operator": "Empresa Municipal de Áreas Verdes y Recreación Alternativa",
+      "urlPath": "empresa-municipal-de-areas-verdes-y-recreacion-alternativa/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 0
+      }
+    },
+    {
+      "slug": "mi-tren",
+      "operator": "Mi Tren",
+      "urlPath": "mi-tren/",
+      "stats": {
+        "totalVariants": 6,
+        "uniqueRefs": 3,
+        "errors": 0,
+        "totalStops": 12
+      }
+    },
+    {
+      "slug": "sindicato-de-colectiveros-y-microbuses-radio-urbano-y-suburbano-ciudad-de-cochab",
+      "operator": "Sindicato de colectiveros y microbuses radio urbano y suburbano ciudad de Cochabamba",
+      "urlPath": "sindicato-de-colectiveros-y-microbuses-radio-urbano-y-suburbano-ciudad-de-cochab/",
+      "stats": {
+        "totalVariants": 38,
+        "uniqueRefs": 18,
+        "errors": 0,
+        "totalStops": 5167
+      }
+    },
+    {
+      "slug": "sindicato-de-taxi-trufis-15-de-abril",
+      "operator": "Sindicato de taxi trufis 15 de abril",
+      "urlPath": "sindicato-de-taxi-trufis-15-de-abril/",
+      "stats": {
+        "totalVariants": 3,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 373
+      }
+    },
+    {
+      "slug": "sindicato-de-taxi-trufis-30-de-noviembre",
+      "operator": "Sindicato de taxi trufis 30 de noviembre",
+      "urlPath": "sindicato-de-taxi-trufis-30-de-noviembre/",
+      "stats": {
+        "totalVariants": 15,
+        "uniqueRefs": 4,
+        "errors": 0,
+        "totalStops": 2336
+      }
+    },
+    {
+      "slug": "sindicato-de-taxis-y-trufis-14-de-septiembre",
+      "operator": "Sindicato de taxis y trufis 14 de septiembre",
+      "urlPath": "sindicato-de-taxis-y-trufis-14-de-septiembre/",
+      "stats": {
+        "totalVariants": 28,
+        "uniqueRefs": 11,
+        "errors": 0,
+        "totalStops": 3778
+      }
+    },
+    {
+      "slug": "sindicato-de-trufibuses-15-de-agosto",
+      "operator": "Sindicato de trufibuses 15 de agosto",
+      "urlPath": "sindicato-de-trufibuses-15-de-agosto/",
+      "stats": {
+        "totalVariants": 10,
+        "uniqueRefs": 2,
+        "errors": 0,
+        "totalStops": 1610
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-autotransporte-6-de-agosto-sipe-sipe",
+      "operator": "Sindicato mixto de autotransporte 6 de agosto Sipe Sipe",
+      "urlPath": "sindicato-mixto-de-autotransporte-6-de-agosto-sipe-sipe/",
+      "stats": {
+        "totalVariants": 34,
+        "uniqueRefs": 4,
+        "errors": 0,
+        "totalStops": 7244
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-autotransporte-canton-itapaya",
+      "operator": "Sindicato mixto de autotransporte Cantón Itapaya",
+      "urlPath": "sindicato-mixto-de-autotransporte-canton-itapaya/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 457
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-autotransporte-sacaba",
+      "operator": "Sindicato mixto de autotransporte Sacaba",
+      "urlPath": "sindicato-mixto-de-autotransporte-sacaba/",
+      "stats": {
+        "totalVariants": 84,
+        "uniqueRefs": 7,
+        "errors": 0,
+        "totalStops": 14930
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-12-de-octubre",
+      "operator": "Sindicato mixto de transporte 12 de octubre",
+      "urlPath": "sindicato-mixto-de-transporte-12-de-octubre/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 2,
+        "errors": 0,
+        "totalStops": 756
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-bolivia",
+      "operator": "Sindicato mixto de transporte Bolivia",
+      "urlPath": "sindicato-mixto-de-transporte-bolivia/",
+      "stats": {
+        "totalVariants": 18,
+        "uniqueRefs": 5,
+        "errors": 0,
+        "totalStops": 2461
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-expreso-abaroa",
+      "operator": "Sindicato Mixto de Transporte Expreso Abaroa",
+      "urlPath": "sindicato-mixto-de-transporte-expreso-abaroa/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 70
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-publico-6-de-mayo",
+      "operator": "Sindicato mixto de transporte público 6 de mayo",
+      "urlPath": "sindicato-mixto-de-transporte-publico-6-de-mayo/",
+      "stats": {
+        "totalVariants": 28,
+        "uniqueRefs": 12,
+        "errors": 0,
+        "totalStops": 3996
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-santa-veracruz",
+      "operator": "Sindicato mixto de transporte Santa Veracruz",
+      "urlPath": "sindicato-mixto-de-transporte-santa-veracruz/",
+      "stats": {
+        "totalVariants": 7,
+        "uniqueRefs": 4,
+        "errors": 0,
+        "totalStops": 1127
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-sebastian-pagador",
+      "operator": "Sindicato mixto de transporte Sebastian Pagador",
+      "urlPath": "sindicato-mixto-de-transporte-sebastian-pagador/",
+      "stats": {
+        "totalVariants": 10,
+        "uniqueRefs": 4,
+        "errors": 0,
+        "totalStops": 1604
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transporte-tropico",
+      "operator": "Sindicato mixto de transporte Trópico",
+      "urlPath": "sindicato-mixto-de-transporte-tropico/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 2,
+        "errors": 0,
+        "totalStops": 423
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transportistas-16-de-noviembre",
+      "operator": "Sindicato mixto de transportistas 16 de noviembre",
+      "urlPath": "sindicato-mixto-de-transportistas-16-de-noviembre/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 2,
+        "errors": 0,
+        "totalStops": 663
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transportistas-21-de-julio",
+      "operator": "Sindicato mixto de transportistas 21 de julio",
+      "urlPath": "sindicato-mixto-de-transportistas-21-de-julio/",
+      "stats": {
+        "totalVariants": 18,
+        "uniqueRefs": 3,
+        "errors": 0,
+        "totalStops": 2966
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transportistas-avaroa",
+      "operator": "Sindicato mixto de transportistas Avaroa",
+      "urlPath": "sindicato-mixto-de-transportistas-avaroa/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 325
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transportistas-nuestra-senora-del-carmen",
+      "operator": "Sindicato mixto de transportistas Nuestra Señora del Carmen",
+      "urlPath": "sindicato-mixto-de-transportistas-nuestra-senora-del-carmen/",
+      "stats": {
+        "totalVariants": 6,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 884
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transportistas-santa-rosa-de-lima",
+      "operator": "Sindicato mixto de transportistas Santa Rosa de Lima",
+      "urlPath": "sindicato-mixto-de-transportistas-santa-rosa-de-lima/",
+      "stats": {
+        "totalVariants": 87,
+        "uniqueRefs": 4,
+        "errors": 0,
+        "totalStops": 15566
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-transportistas-tiquipaya",
+      "operator": "Sindicato mixto de transportistas Tiquipaya",
+      "urlPath": "sindicato-mixto-de-transportistas-tiquipaya/",
+      "stats": {
+        "totalVariants": 42,
+        "uniqueRefs": 6,
+        "errors": 0,
+        "totalStops": 5096
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-trufibuses-3-de-noviembre",
+      "operator": "Sindicato mixto de trufibuses 3 de noviembre",
+      "urlPath": "sindicato-mixto-de-trufibuses-3-de-noviembre/",
+      "stats": {
+        "totalVariants": 8,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 1267
+      }
+    },
+    {
+      "slug": "sindicato-mixto-de-trufibuses-vinto",
+      "operator": "Sindicato mixto de trufibuses Vinto",
+      "urlPath": "sindicato-mixto-de-trufibuses-vinto/",
+      "stats": {
+        "totalVariants": 32,
+        "uniqueRefs": 4,
+        "errors": 0,
+        "totalStops": 6316
+      }
+    },
+    {
+      "slug": "sindicato-mixto-transporte-urkupina",
+      "operator": "Sindicato mixto transporte Urkupiña",
+      "urlPath": "sindicato-mixto-transporte-urkupina/",
+      "stats": {
+        "totalVariants": 22,
+        "uniqueRefs": 5,
+        "errors": 0,
+        "totalStops": 3410
+      }
+    },
+    {
+      "slug": "sindicato-pucara-grande",
+      "operator": "Sindicato Pucara Grande",
+      "urlPath": "sindicato-pucara-grande/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 323
+      }
+    },
+    {
+      "slug": "sindicato-senor-de-buen-viaje-el-paso",
+      "operator": "Sindicato Señor de Buen Viaje El Paso",
+      "urlPath": "sindicato-senor-de-buen-viaje-el-paso/",
+      "stats": {
+        "totalVariants": 4,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 568
+      }
+    },
+    {
+      "slug": "taquina",
+      "operator": "Taquiña",
+      "urlPath": "taquina/",
+      "stats": {
+        "totalVariants": 2,
+        "uniqueRefs": 1,
+        "errors": 0,
+        "totalStops": 61
+      }
+    }
+  ]
+}

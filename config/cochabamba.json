@@ -1,0 +1,7 @@
+{
+  "cityName": "cochabamba",
+  "displayName": "Cochabamba, Bolivia",
+  "gtfsOutDir": "../../trufi-gtfs-builder/examples/Bolivia-Cochabamba/out",
+  "siteSubdir": "cochabamba",
+  "githubPagesBasePath": "/sindicatos-routes/site/cochabamba"
+}
