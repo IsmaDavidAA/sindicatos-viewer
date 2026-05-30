@@ -112,7 +112,15 @@ export function generateSindicatoHtml(report: SindicatoReport): string {
       border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer;
     }
     .map-sidebar-actions button:hover { background: #e2e8f0; }
-    .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
+    .route-visibility-list {
+      overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0;
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    }
+    .sidebar-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 430;
+      background: rgba(15,23,42,0.35); border: none; padding: 0; cursor: pointer;
+    }
+    .sidebar-backdrop.visible { display: block; }
     .vis-ref-group { border-bottom: 1px solid var(--border); }
     .vis-ref-head {
       display: flex; align-items: center; gap: 0.35rem;
@@ -220,14 +228,83 @@ export function generateSindicatoHtml(report: SindicatoReport): string {
     .status-ok { color: var(--ok); }
     .status-err { color: var(--err); }
     @media (max-width: 900px) {
-      :root { --chrome-h: 6.5rem; }
       .sidebar-toggle { display: block; }
       .map-sidebar {
         position: absolute; left: 0; top: 0; bottom: 0;
+        width: min(300px, 88vw);
         box-shadow: 4px 0 16px rgba(0,0,0,0.15);
       }
-      .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+      .map-sidebar.collapsed { transform: translateX(-100%); width: min(300px, 88vw); }
       .fab-validate { bottom: 1rem; right: 1rem; font-size: 0.9rem; padding: 0.7rem 1.1rem; }
+    }
+    @media (max-width: 768px) {
+      .top-row { padding: 0.45rem 0.75rem; gap: 0.35rem 0.5rem; }
+      .top-row h1 { font-size: 0.95rem; min-width: 0; }
+      .top-meta { white-space: normal; font-size: 0.72rem; }
+      .stats { width: 100%; }
+      .stat { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
+      .toolbar {
+        padding: 0.4rem 0.75rem; gap: 0.35rem;
+        overflow-x: auto; flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .toolbar::-webkit-scrollbar { display: none; }
+      .toolbar input[type=search] { min-width: 7rem; max-width: none; flex: 1 1 7rem; }
+      .toolbar select { max-width: 8rem; flex-shrink: 0; }
+      .progress-bar { display: none; }
+      .sidebar-toggle { display: none; }
+      .map-workspace { flex-direction: column; }
+      .map-main {
+        flex: 1; width: 100%; min-height: 0;
+        padding-bottom: calc(3.25rem + env(safe-area-inset-bottom, 0px));
+      }
+      .map-main-head { font-size: 0.72rem; padding: 0.3rem 0.65rem; }
+      .map-sidebar {
+        position: fixed;
+        left: 0; right: 0; bottom: 0; top: auto;
+        width: 100%; height: auto;
+        max-height: min(52dvh, 22rem);
+        border-right: none;
+        border-top: 1px solid var(--border);
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -6px 28px rgba(0,0,0,0.2);
+        transform: translateY(0);
+        z-index: 460;
+      }
+      .map-sidebar.collapsed {
+        transform: translateY(calc(100% - 3.1rem));
+        width: 100%;
+        max-height: min(52dvh, 22rem);
+        overflow: hidden;
+      }
+      .map-sidebar.collapsed .route-visibility-list,
+      .map-sidebar.collapsed .map-sidebar-actions { display: none; }
+      .map-sidebar-head {
+        cursor: pointer; touch-action: manipulation;
+        padding: 0.5rem 0.85rem;
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+      }
+      .map-sidebar-head h2 {
+        display: flex; align-items: center; gap: 0.4rem;
+        font-size: 0.85rem;
+      }
+      .map-sidebar-head h2::before {
+        content: '▲'; font-size: 0.65rem; color: var(--muted);
+        transition: transform 0.2s;
+      }
+      .map-sidebar.collapsed .map-sidebar-head h2::before { transform: rotate(180deg); }
+      .route-visibility-list {
+        max-height: calc(min(52dvh, 22rem) - 4.5rem);
+        flex: none;
+      }
+      .fab-validate {
+        bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+        right: 0.85rem; font-size: 0.85rem; padding: 0.65rem 1rem;
+      }
+      body.sidebar-sheet-open .fab-validate {
+        bottom: calc(min(52dvh, 22rem) + 0.85rem);
+      }
     }
   </style>
 </head>
@@ -256,6 +333,7 @@ export function generateSindicatoHtml(report: SindicatoReport): string {
   </div>
 
   <div class="map-workspace">
+    <button type="button" class="sidebar-backdrop" id="sidebar-backdrop" aria-label="Cerrar panel de rutas"></button>
     <button type="button" class="sidebar-toggle" id="sidebar-toggle-mobile">☰ Rutas</button>
     <aside class="map-sidebar" id="map-sidebar">
       <div class="map-sidebar-head">
@@ -836,15 +914,55 @@ export function generateSindicatoHtml(report: SindicatoReport): string {
     setTimeout(function () { overviewMap.invalidateSize(); }, 80);
   }
 
-  function toggleSidebar() {
+  function syncChromeHeight() {
+    var chrome = document.querySelector('.top-chrome');
+    if (chrome) {
+      document.documentElement.style.setProperty('--chrome-h', chrome.offsetHeight + 'px');
+    }
+  }
+
+  function isMobileSheet() {
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function updateSidebarUi() {
     var sb = document.getElementById('map-sidebar');
-    sb.classList.toggle('collapsed');
+    var open = !sb.classList.contains('collapsed');
+    document.body.classList.toggle('sidebar-sheet-open', isMobileSheet() && open);
+    document.getElementById('sidebar-backdrop').classList.toggle('visible', isMobileSheet() && open);
+  }
+
+  function toggleSidebar(forceOpen) {
+    var sb = document.getElementById('map-sidebar');
+    if (typeof forceOpen === 'boolean') {
+      sb.classList.toggle('collapsed', !forceOpen);
+    } else {
+      sb.classList.toggle('collapsed');
+    }
+    updateSidebarUi();
     invalidateMap();
   }
 
-  document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
-  document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
-  window.addEventListener('resize', invalidateMap);
+  document.getElementById('toggle-sidebar').addEventListener('click', function () { toggleSidebar(); });
+  document.getElementById('sidebar-toggle-mobile').addEventListener('click', function () { toggleSidebar(); });
+  document.getElementById('sidebar-backdrop').addEventListener('click', function () { toggleSidebar(false); });
+  document.querySelector('.map-sidebar-head').addEventListener('click', function (e) {
+    if (!isMobileSheet()) return;
+    if (e.target.closest('.map-sidebar-actions')) return;
+    toggleSidebar();
+  });
+
+  if (isMobileSheet()) {
+    document.getElementById('map-sidebar').classList.add('collapsed');
+  }
+  updateSidebarUi();
+
+  window.addEventListener('resize', function () {
+    syncChromeHeight();
+    updateSidebarUi();
+    invalidateMap();
+  });
+  syncChromeHeight();
   setTimeout(invalidateMap, 150);
   setTimeout(invalidateMap, 500);
 })();

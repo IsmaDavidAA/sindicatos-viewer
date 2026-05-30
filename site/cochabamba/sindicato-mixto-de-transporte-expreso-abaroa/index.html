@@ -87,7 +87,15 @@
       border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer;
     }
     .map-sidebar-actions button:hover { background: #e2e8f0; }
-    .route-visibility-list { overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0; }
+    .route-visibility-list {
+      overflow-y: auto; flex: 1; min-height: 0; padding: 0.25rem 0;
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    }
+    .sidebar-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 430;
+      background: rgba(15,23,42,0.35); border: none; padding: 0; cursor: pointer;
+    }
+    .sidebar-backdrop.visible { display: block; }
     .vis-ref-group { border-bottom: 1px solid var(--border); }
     .vis-ref-head {
       display: flex; align-items: center; gap: 0.35rem;
@@ -195,14 +203,83 @@
     .status-ok { color: var(--ok); }
     .status-err { color: var(--err); }
     @media (max-width: 900px) {
-      :root { --chrome-h: 6.5rem; }
       .sidebar-toggle { display: block; }
       .map-sidebar {
         position: absolute; left: 0; top: 0; bottom: 0;
+        width: min(300px, 88vw);
         box-shadow: 4px 0 16px rgba(0,0,0,0.15);
       }
-      .map-sidebar.collapsed { transform: translateX(-100%); width: 300px; }
+      .map-sidebar.collapsed { transform: translateX(-100%); width: min(300px, 88vw); }
       .fab-validate { bottom: 1rem; right: 1rem; font-size: 0.9rem; padding: 0.7rem 1.1rem; }
+    }
+    @media (max-width: 768px) {
+      .top-row { padding: 0.45rem 0.75rem; gap: 0.35rem 0.5rem; }
+      .top-row h1 { font-size: 0.95rem; min-width: 0; }
+      .top-meta { white-space: normal; font-size: 0.72rem; }
+      .stats { width: 100%; }
+      .stat { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
+      .toolbar {
+        padding: 0.4rem 0.75rem; gap: 0.35rem;
+        overflow-x: auto; flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .toolbar::-webkit-scrollbar { display: none; }
+      .toolbar input[type=search] { min-width: 7rem; max-width: none; flex: 1 1 7rem; }
+      .toolbar select { max-width: 8rem; flex-shrink: 0; }
+      .progress-bar { display: none; }
+      .sidebar-toggle { display: none; }
+      .map-workspace { flex-direction: column; }
+      .map-main {
+        flex: 1; width: 100%; min-height: 0;
+        padding-bottom: calc(3.25rem + env(safe-area-inset-bottom, 0px));
+      }
+      .map-main-head { font-size: 0.72rem; padding: 0.3rem 0.65rem; }
+      .map-sidebar {
+        position: fixed;
+        left: 0; right: 0; bottom: 0; top: auto;
+        width: 100%; height: auto;
+        max-height: min(52dvh, 22rem);
+        border-right: none;
+        border-top: 1px solid var(--border);
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -6px 28px rgba(0,0,0,0.2);
+        transform: translateY(0);
+        z-index: 460;
+      }
+      .map-sidebar.collapsed {
+        transform: translateY(calc(100% - 3.1rem));
+        width: 100%;
+        max-height: min(52dvh, 22rem);
+        overflow: hidden;
+      }
+      .map-sidebar.collapsed .route-visibility-list,
+      .map-sidebar.collapsed .map-sidebar-actions { display: none; }
+      .map-sidebar-head {
+        cursor: pointer; touch-action: manipulation;
+        padding: 0.5rem 0.85rem;
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+      }
+      .map-sidebar-head h2 {
+        display: flex; align-items: center; gap: 0.4rem;
+        font-size: 0.85rem;
+      }
+      .map-sidebar-head h2::before {
+        content: '▲'; font-size: 0.65rem; color: var(--muted);
+        transition: transform 0.2s;
+      }
+      .map-sidebar.collapsed .map-sidebar-head h2::before { transform: rotate(180deg); }
+      .route-visibility-list {
+        max-height: calc(min(52dvh, 22rem) - 4.5rem);
+        flex: none;
+      }
+      .fab-validate {
+        bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+        right: 0.85rem; font-size: 0.85rem; padding: 0.65rem 1rem;
+      }
+      body.sidebar-sheet-open .fab-validate {
+        bottom: calc(min(52dvh, 22rem) + 0.85rem);
+      }
     }
   </style>
 </head>
@@ -231,6 +308,7 @@
   </div>
 
   <div class="map-workspace">
+    <button type="button" class="sidebar-backdrop" id="sidebar-backdrop" aria-label="Cerrar panel de rutas"></button>
     <button type="button" class="sidebar-toggle" id="sidebar-toggle-mobile">☰ Rutas</button>
     <aside class="map-sidebar" id="map-sidebar">
       <div class="map-sidebar-head">
@@ -269,7 +347,7 @@
     </div>
   </div>
 
-  <script id="report-data" type="application/json">{"slug":"sindicato-mixto-de-transporte-expreso-abaroa","operator":"Sindicato Mixto de Transporte Expreso Abaroa","cityName":"cochabamba","generatedAt":"2026-05-30T19:34:51.041Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":70},"refGroups":[{"ref":"303","gtfsRouteId":140,"routeColor":"888888","routeLongName":"Trufi 303","variants":[{"osmId":20777780,"ref":"303","name":"Trufi 303: Avenida Villazon → Paraiso","from":"Avenida Villazon","to":"Paraiso","description":"","tripHeadsign":"Paraiso","routeType":"bus","gtfsRouteId":140,"routeColor":"888888","stopCount":35,"stops":[{"id":13895132111,"name":"Innominada","lat":-17.3897384,"lon":-66.0821345},{"id":1609200001,"name":"Innominada","lat":-17.3911353,"lon":-66.0823682},{"id":1609200014,"name":"Innominada","lat":-17.3930422,"lon":-66.0826568},{"id":4251839243,"name":"Innominada","lat":-17.3932834,"lon":-66.0826136},{"id":4251839246,"name":"Innominada","lat":-17.3934718,"lon":-66.0824848},{"id":4251839254,"name":"Innominada","lat":-17.3940286,"lon":-66.0820305},{"id":4251839260,"name":"Innominada","lat":-17.3946664,"lon":-66.0820936},{"id":2735650792,"name":"Innominada","lat":-17.3951555,"lon":-66.0820675},{"id":1613896834,"name":"Innominada","lat":-17.3953684,"lon":-66.0820337},{"id":1609200180,"name":"Innominada","lat":-17.3963944,"lon":-66.0816986},{"id":1609200254,"name":"Innominada","lat":-17.3983144,"lon":-66.0810784},{"id":8400342652,"name":"Innominada","lat":-17.3987465,"lon":-66.0809811},{"id":4251839271,"name":"Innominada","lat":-17.4002913,"lon":-66.0806957},{"id":8400342651,"name":"Innominada","lat":-17.4014777,"lon":-66.0804583},{"id":1609200113,"name":"Innominada","lat":-17.4018998,"lon":-66.0803565},{"id":1609200016,"name":"Avenida Cristo de la Concordia","lat":-17.4039545,"lon":-66.0799634},{"id":1610493204,"name":"Avenida Cristo de la Concordia","lat":-17.4041442,"lon":-66.0812358},{"id":8399666589,"name":"Innominada","lat":-17.4052833,"lon":-66.0810364},{"id":2028828187,"name":"Innominada","lat":-17.4057733,"lon":-66.0809382},{"id":7554585134,"name":"Innominada","lat":-17.406347,"lon":-66.0808341},{"id":2028828262,"name":"Innominada","lat":-17.407283,"lon":-66.0806493},{"id":5430083319,"name":"Innominada","lat":-17.4079741,"lon":-66.0805271},{"id":5430083317,"name":"Innominada","lat":-17.4089584,"lon":-66.0803478},{"id":7243761482,"name":"Innominada","lat":-17.4098101,"lon":-66.0801914},{"id":2028828146,"name":"Innominada","lat":-17.4104214,"lon":-66.0800711},{"id":2028803095,"name":"Avenida Juan José Torres González","lat":-17.411519,"lon":-66.0798715},{"id":2028828130,"name":"Innominada","lat":-17.4121768,"lon":-66.0797534},{"id":7243761472,"name":"Innominada","lat":-17.4137768,"lon":-66.0794678},{"id":2028828286,"name":"Innominada","lat":-17.4147459,"lon":-66.0792982},{"id":3562574335,"name":"Innominada","lat":-17.4156093,"lon":-66.079145},{"id":3562574371,"name":"Innominada","lat":-17.416307,"lon":-66.0790277},{"id":2028828291,"name":"Innominada","lat":-17.4163748,"lon":-66.0790166},{"id":2028828266,"name":"Innominada","lat":-17.4172031,"lon":-66.0788746},{"id":3562574508,"name":"Innominada","lat":-17.4181379,"lon":-66.0787054},{"id":13895132110,"name":"Innominada","lat":-17.4194765,"lon":-66.079127}],"coordinates":[[-66.0821345,-17.3897384],[-66.0822351,-17.3902978],[-66.0823682,-17.3911353],[-66.0825774,-17.3925726],[-66.0826568,-17.3930422],[-66.0826504,-17.3931746],[-66.0826136,-17.3932834],[-66.0824848,-17.3934718],[-66.0821465,-17.3938664],[-66.0820305,-17.3940286],[-66.082027,-17.3941044],[-66.0820936,-17.3946664],[-66.0821041,-17.39485],[-66.0820675,-17.3951555],[-66.0820538,-17.3952637],[-66.0820337,-17.3953684],[-66.0818722,-17.3958815],[-66.0816986,-17.3963944],[-66.0814392,-17.3972545],[-66.0810784,-17.3983144],[-66.0809811,-17.3987465],[-66.0808603,-17.3993443],[-66.0806957,-17.4002913],[-66.0806003,-17.4007274],[-66.0804583,-17.4014777],[-66.0804101,-17.4016681],[-66.0803565,-17.4018998],[-66.0801675,-17.4028469],[-66.0799634,-17.4039545],[-66.0805345,-17.4040396],[-66.0812358,-17.4041442],[-66.0812084,-17.4042807],[-66.0810364,-17.4052833],[-66.0809382,-17.4057733],[-66.0809171,-17.4058896],[-66.0808341,-17.406347],[-66.0807943,-17.406566],[-66.0806493,-17.407283],[-66.0805371,-17.4079182],[-66.0805271,-17.4079741],[-66.0803986,-17.40869],[-66.0803478,-17.4089584],[-66.0802223,-17.409622],[-66.0801914,-17.4098101],[-66.0800711,-17.4104214],[-66.0799705,-17.410968],[-66.0798715,-17.411519],[-66.0798485,-17.4116358],[-66.0797534,-17.4121768],[-66.079522,-17.4134684],[-66.0794678,-17.4137768],[-66.0793518,-17.4144372],[-66.0792982,-17.4147459],[-66.079273,-17.4148909],[-66.079145,-17.4156093],[-66.0791026,-17.4158471],[-66.0790277,-17.416307],[-66.0790166,-17.4163748],[-66.0789325,-17.416954],[-66.0788746,-17.4172031],[-66.0788187,-17.4175118],[-66.0787054,-17.4181379],[-66.0785902,-17.4187616],[-66.078482,-17.4193688],[-66.079127,-17.4194765]],"osmUrl":"https://www.openstreetmap.org/relation/20777780","status":"ok","errorMessage":"","fee":"","onDemand":"","directionLabel":"ida","directionId":0},{"osmId":20777813,"ref":"303","name":"Trufi 303: Paraiso → Avenida Villazon","from":"Paraiso","to":"Avenida Villazon","description":"","tripHeadsign":"Avenida Villazon","routeType":"bus","gtfsRouteId":140,"routeColor":"888888","stopCount":35,"stops":[{"id":13895132110,"name":"Innominada","lat":-17.4194765,"lon":-66.079127},{"id":2028828272,"name":"Innominada","lat":-17.4187616,"lon":-66.0785902},{"id":7243739514,"name":"Innominada","lat":-17.4175118,"lon":-66.0788187},{"id":2028828192,"name":"Innominada","lat":-17.416954,"lon":-66.0789325},{"id":2028828291,"name":"Innominada","lat":-17.4163748,"lon":-66.0790166},{"id":2028828213,"name":"Innominada","lat":-17.4158471,"lon":-66.0791026},{"id":2028828121,"name":"Innominada","lat":-17.4148909,"lon":-66.079273},{"id":2028828269,"name":"Innominada","lat":-17.4144372,"lon":-66.0793518},{"id":2028828259,"name":"Innominada","lat":-17.4134684,"lon":-66.079522},{"id":3562574109,"name":"Avenida Juan José Torres González","lat":-17.4116358,"lon":-66.0798485},{"id":3562574070,"name":"Innominada","lat":-17.410968,"lon":-66.0799705},{"id":2028828146,"name":"Innominada","lat":-17.4104214,"lon":-66.0800711},{"id":3562574010,"name":"Innominada","lat":-17.409622,"lon":-66.0802223},{"id":3562573992,"name":"Innominada","lat":-17.40869,"lon":-66.0803986},{"id":3562573958,"name":"Innominada","lat":-17.4079182,"lon":-66.0805371},{"id":3562573907,"name":"Innominada","lat":-17.406566,"lon":-66.0807943},{"id":5430084325,"name":"Innominada","lat":-17.4058896,"lon":-66.0809171},{"id":8399666589,"name":"Innominada","lat":-17.4052833,"lon":-66.0810364},{"id":1610493383,"name":"Avenida Bolivia","lat":-17.4042807,"lon":-66.0812084},{"id":13895587376,"name":"Avenida Cristo de la Concordia","lat":-17.4040396,"lon":-66.0805345},{"id":1609200089,"name":"Innominada","lat":-17.4028469,"lon":-66.0801675},{"id":1609200033,"name":"Innominada","lat":-17.4016681,"lon":-66.0804101},{"id":3562573507,"name":"Innominada","lat":-17.4007274,"lon":-66.0806003},{"id":1609200271,"name":"Innominada","lat":-17.3993443,"lon":-66.0808603},{"id":8400342652,"name":"Innominada","lat":-17.3987465,"lon":-66.0809811},{"id":1609200325,"name":"Innominada","lat":-17.3972545,"lon":-66.0814392},{"id":1609200143,"name":"Innominada","lat":-17.3958815,"lon":-66.0818722},{"id":10102435922,"name":"Innominada","lat":-17.3952637,"lon":-66.0820538},{"id":1609199982,"name":"Innominada","lat":-17.39485,"lon":-66.0821041},{"id":1609200129,"name":"Innominada","lat":-17.3941044,"lon":-66.082027},{"id":4251839250,"name":"Innominada","lat":-17.3938664,"lon":-66.0821465},{"id":4251839246,"name":"Innominada","lat":-17.3934718,"lon":-66.0824848},{"id":4251839242,"name":"Innominada","lat":-17.3931746,"lon":-66.0826504},{"id":1609200119,"name":"Avenida Chapare","lat":-17.3925726,"lon":-66.0825774},{"id":13895132111,"name":"Innominada","lat":-17.3897384,"lon":-66.0821345}],"coordinates":[[-66.079127,-17.4194765],[-66.078482,-17.4193688],[-66.0785902,-17.4187616],[-66.0787054,-17.4181379],[-66.0788187,-17.4175118],[-66.0788746,-17.4172031],[-66.0789325,-17.416954],[-66.0790166,-17.4163748],[-66.0790277,-17.416307],[-66.0791026,-17.4158471],[-66.079145,-17.4156093],[-66.079273,-17.4148909],[-66.0792982,-17.4147459],[-66.0793518,-17.4144372],[-66.0794678,-17.4137768],[-66.079522,-17.4134684],[-66.0797534,-17.4121768],[-66.0798485,-17.4116358],[-66.0798715,-17.411519],[-66.0799705,-17.410968],[-66.0800711,-17.4104214],[-66.0801914,-17.4098101],[-66.0802223,-17.409622],[-66.0803478,-17.4089584],[-66.0803986,-17.40869],[-66.0805271,-17.4079741],[-66.0805371,-17.4079182],[-66.0806493,-17.407283],[-66.0807943,-17.406566],[-66.0808341,-17.406347],[-66.0809171,-17.4058896],[-66.0809382,-17.4057733],[-66.0810364,-17.4052833],[-66.0812084,-17.4042807],[-66.0812358,-17.4041442],[-66.0805345,-17.4040396],[-66.0799634,-17.4039545],[-66.0801675,-17.4028469],[-66.0803565,-17.4018998],[-66.0804101,-17.4016681],[-66.0804583,-17.4014777],[-66.0806003,-17.4007274],[-66.0806957,-17.4002913],[-66.0808603,-17.3993443],[-66.0809811,-17.3987465],[-66.0810784,-17.3983144],[-66.0814392,-17.3972545],[-66.0816986,-17.3963944],[-66.0818722,-17.3958815],[-66.0820337,-17.3953684],[-66.0820538,-17.3952637],[-66.0820675,-17.3951555],[-66.0821041,-17.39485],[-66.0820936,-17.3946664],[-66.082027,-17.3941044],[-66.0820305,-17.3940286],[-66.0821465,-17.3938664],[-66.0824848,-17.3934718],[-66.0826136,-17.3932834],[-66.0826504,-17.3931746],[-66.0826568,-17.3930422],[-66.0825774,-17.3925726],[-66.0823682,-17.3911353],[-66.0822351,-17.3902978],[-66.0821345,-17.3897384]],"osmUrl":"https://www.openstreetmap.org/relation/20777813","status":"ok","errorMessage":"","fee":"","onDemand":"","directionLabel":"vuelta","directionId":1}]}]}</script>
+  <script id="report-data" type="application/json">{"slug":"sindicato-mixto-de-transporte-expreso-abaroa","operator":"Sindicato Mixto de Transporte Expreso Abaroa","cityName":"cochabamba","generatedAt":"2026-05-30T21:18:34.125Z","stats":{"totalVariants":2,"uniqueRefs":1,"errors":0,"totalStops":70},"refGroups":[{"ref":"303","gtfsRouteId":140,"routeColor":"888888","routeLongName":"Trufi 303","variants":[{"osmId":20777780,"ref":"303","name":"Trufi 303: Avenida Villazon → Paraiso","from":"Avenida Villazon","to":"Paraiso","description":"","tripHeadsign":"Paraiso","routeType":"bus","gtfsRouteId":140,"routeColor":"888888","stopCount":35,"stops":[{"id":13895132111,"name":"Innominada","lat":-17.3897384,"lon":-66.0821345},{"id":1609200001,"name":"Innominada","lat":-17.3911353,"lon":-66.0823682},{"id":1609200014,"name":"Innominada","lat":-17.3930422,"lon":-66.0826568},{"id":4251839243,"name":"Innominada","lat":-17.3932834,"lon":-66.0826136},{"id":4251839246,"name":"Innominada","lat":-17.3934718,"lon":-66.0824848},{"id":4251839254,"name":"Innominada","lat":-17.3940286,"lon":-66.0820305},{"id":4251839260,"name":"Innominada","lat":-17.3946664,"lon":-66.0820936},{"id":2735650792,"name":"Innominada","lat":-17.3951555,"lon":-66.0820675},{"id":1613896834,"name":"Innominada","lat":-17.3953684,"lon":-66.0820337},{"id":1609200180,"name":"Innominada","lat":-17.3963944,"lon":-66.0816986},{"id":1609200254,"name":"Innominada","lat":-17.3983144,"lon":-66.0810784},{"id":8400342652,"name":"Innominada","lat":-17.3987465,"lon":-66.0809811},{"id":4251839271,"name":"Innominada","lat":-17.4002913,"lon":-66.0806957},{"id":8400342651,"name":"Innominada","lat":-17.4014777,"lon":-66.0804583},{"id":1609200113,"name":"Innominada","lat":-17.4018998,"lon":-66.0803565},{"id":1609200016,"name":"Avenida Cristo de la Concordia","lat":-17.4039545,"lon":-66.0799634},{"id":1610493204,"name":"Avenida Cristo de la Concordia","lat":-17.4041442,"lon":-66.0812358},{"id":8399666589,"name":"Innominada","lat":-17.4052833,"lon":-66.0810364},{"id":2028828187,"name":"Innominada","lat":-17.4057733,"lon":-66.0809382},{"id":7554585134,"name":"Innominada","lat":-17.406347,"lon":-66.0808341},{"id":2028828262,"name":"Innominada","lat":-17.407283,"lon":-66.0806493},{"id":5430083319,"name":"Innominada","lat":-17.4079741,"lon":-66.0805271},{"id":5430083317,"name":"Innominada","lat":-17.4089584,"lon":-66.0803478},{"id":7243761482,"name":"Innominada","lat":-17.4098101,"lon":-66.0801914},{"id":2028828146,"name":"Innominada","lat":-17.4104214,"lon":-66.0800711},{"id":2028803095,"name":"Avenida Juan José Torres González","lat":-17.411519,"lon":-66.0798715},{"id":2028828130,"name":"Innominada","lat":-17.4121768,"lon":-66.0797534},{"id":7243761472,"name":"Innominada","lat":-17.4137768,"lon":-66.0794678},{"id":2028828286,"name":"Innominada","lat":-17.4147459,"lon":-66.0792982},{"id":3562574335,"name":"Innominada","lat":-17.4156093,"lon":-66.079145},{"id":3562574371,"name":"Innominada","lat":-17.416307,"lon":-66.0790277},{"id":2028828291,"name":"Innominada","lat":-17.4163748,"lon":-66.0790166},{"id":2028828266,"name":"Innominada","lat":-17.4172031,"lon":-66.0788746},{"id":3562574508,"name":"Innominada","lat":-17.4181379,"lon":-66.0787054},{"id":13895132110,"name":"Innominada","lat":-17.4194765,"lon":-66.079127}],"coordinates":[[-66.0821345,-17.3897384],[-66.0822351,-17.3902978],[-66.0823682,-17.3911353],[-66.0825774,-17.3925726],[-66.0826568,-17.3930422],[-66.0826504,-17.3931746],[-66.0826136,-17.3932834],[-66.0824848,-17.3934718],[-66.0821465,-17.3938664],[-66.0820305,-17.3940286],[-66.082027,-17.3941044],[-66.0820936,-17.3946664],[-66.0821041,-17.39485],[-66.0820675,-17.3951555],[-66.0820538,-17.3952637],[-66.0820337,-17.3953684],[-66.0818722,-17.3958815],[-66.0816986,-17.3963944],[-66.0814392,-17.3972545],[-66.0810784,-17.3983144],[-66.0809811,-17.3987465],[-66.0808603,-17.3993443],[-66.0806957,-17.4002913],[-66.0806003,-17.4007274],[-66.0804583,-17.4014777],[-66.0804101,-17.4016681],[-66.0803565,-17.4018998],[-66.0801675,-17.4028469],[-66.0799634,-17.4039545],[-66.0805345,-17.4040396],[-66.0812358,-17.4041442],[-66.0812084,-17.4042807],[-66.0810364,-17.4052833],[-66.0809382,-17.4057733],[-66.0809171,-17.4058896],[-66.0808341,-17.406347],[-66.0807943,-17.406566],[-66.0806493,-17.407283],[-66.0805371,-17.4079182],[-66.0805271,-17.4079741],[-66.0803986,-17.40869],[-66.0803478,-17.4089584],[-66.0802223,-17.409622],[-66.0801914,-17.4098101],[-66.0800711,-17.4104214],[-66.0799705,-17.410968],[-66.0798715,-17.411519],[-66.0798485,-17.4116358],[-66.0797534,-17.4121768],[-66.079522,-17.4134684],[-66.0794678,-17.4137768],[-66.0793518,-17.4144372],[-66.0792982,-17.4147459],[-66.079273,-17.4148909],[-66.079145,-17.4156093],[-66.0791026,-17.4158471],[-66.0790277,-17.416307],[-66.0790166,-17.4163748],[-66.0789325,-17.416954],[-66.0788746,-17.4172031],[-66.0788187,-17.4175118],[-66.0787054,-17.4181379],[-66.0785902,-17.4187616],[-66.078482,-17.4193688],[-66.079127,-17.4194765]],"osmUrl":"https://www.openstreetmap.org/relation/20777780","status":"ok","errorMessage":"","fee":"","onDemand":"","directionLabel":"ida","directionId":0},{"osmId":20777813,"ref":"303","name":"Trufi 303: Paraiso → Avenida Villazon","from":"Paraiso","to":"Avenida Villazon","description":"","tripHeadsign":"Avenida Villazon","routeType":"bus","gtfsRouteId":140,"routeColor":"888888","stopCount":35,"stops":[{"id":13895132110,"name":"Innominada","lat":-17.4194765,"lon":-66.079127},{"id":2028828272,"name":"Innominada","lat":-17.4187616,"lon":-66.0785902},{"id":7243739514,"name":"Innominada","lat":-17.4175118,"lon":-66.0788187},{"id":2028828192,"name":"Innominada","lat":-17.416954,"lon":-66.0789325},{"id":2028828291,"name":"Innominada","lat":-17.4163748,"lon":-66.0790166},{"id":2028828213,"name":"Innominada","lat":-17.4158471,"lon":-66.0791026},{"id":2028828121,"name":"Innominada","lat":-17.4148909,"lon":-66.079273},{"id":2028828269,"name":"Innominada","lat":-17.4144372,"lon":-66.0793518},{"id":2028828259,"name":"Innominada","lat":-17.4134684,"lon":-66.079522},{"id":3562574109,"name":"Avenida Juan José Torres González","lat":-17.4116358,"lon":-66.0798485},{"id":3562574070,"name":"Innominada","lat":-17.410968,"lon":-66.0799705},{"id":2028828146,"name":"Innominada","lat":-17.4104214,"lon":-66.0800711},{"id":3562574010,"name":"Innominada","lat":-17.409622,"lon":-66.0802223},{"id":3562573992,"name":"Innominada","lat":-17.40869,"lon":-66.0803986},{"id":3562573958,"name":"Innominada","lat":-17.4079182,"lon":-66.0805371},{"id":3562573907,"name":"Innominada","lat":-17.406566,"lon":-66.0807943},{"id":5430084325,"name":"Innominada","lat":-17.4058896,"lon":-66.0809171},{"id":8399666589,"name":"Innominada","lat":-17.4052833,"lon":-66.0810364},{"id":1610493383,"name":"Avenida Bolivia","lat":-17.4042807,"lon":-66.0812084},{"id":13895587376,"name":"Avenida Cristo de la Concordia","lat":-17.4040396,"lon":-66.0805345},{"id":1609200089,"name":"Innominada","lat":-17.4028469,"lon":-66.0801675},{"id":1609200033,"name":"Innominada","lat":-17.4016681,"lon":-66.0804101},{"id":3562573507,"name":"Innominada","lat":-17.4007274,"lon":-66.0806003},{"id":1609200271,"name":"Innominada","lat":-17.3993443,"lon":-66.0808603},{"id":8400342652,"name":"Innominada","lat":-17.3987465,"lon":-66.0809811},{"id":1609200325,"name":"Innominada","lat":-17.3972545,"lon":-66.0814392},{"id":1609200143,"name":"Innominada","lat":-17.3958815,"lon":-66.0818722},{"id":10102435922,"name":"Innominada","lat":-17.3952637,"lon":-66.0820538},{"id":1609199982,"name":"Innominada","lat":-17.39485,"lon":-66.0821041},{"id":1609200129,"name":"Innominada","lat":-17.3941044,"lon":-66.082027},{"id":4251839250,"name":"Innominada","lat":-17.3938664,"lon":-66.0821465},{"id":4251839246,"name":"Innominada","lat":-17.3934718,"lon":-66.0824848},{"id":4251839242,"name":"Innominada","lat":-17.3931746,"lon":-66.0826504},{"id":1609200119,"name":"Avenida Chapare","lat":-17.3925726,"lon":-66.0825774},{"id":13895132111,"name":"Innominada","lat":-17.3897384,"lon":-66.0821345}],"coordinates":[[-66.079127,-17.4194765],[-66.078482,-17.4193688],[-66.0785902,-17.4187616],[-66.0787054,-17.4181379],[-66.0788187,-17.4175118],[-66.0788746,-17.4172031],[-66.0789325,-17.416954],[-66.0790166,-17.4163748],[-66.0790277,-17.416307],[-66.0791026,-17.4158471],[-66.079145,-17.4156093],[-66.079273,-17.4148909],[-66.0792982,-17.4147459],[-66.0793518,-17.4144372],[-66.0794678,-17.4137768],[-66.079522,-17.4134684],[-66.0797534,-17.4121768],[-66.0798485,-17.4116358],[-66.0798715,-17.411519],[-66.0799705,-17.410968],[-66.0800711,-17.4104214],[-66.0801914,-17.4098101],[-66.0802223,-17.409622],[-66.0803478,-17.4089584],[-66.0803986,-17.40869],[-66.0805271,-17.4079741],[-66.0805371,-17.4079182],[-66.0806493,-17.407283],[-66.0807943,-17.406566],[-66.0808341,-17.406347],[-66.0809171,-17.4058896],[-66.0809382,-17.4057733],[-66.0810364,-17.4052833],[-66.0812084,-17.4042807],[-66.0812358,-17.4041442],[-66.0805345,-17.4040396],[-66.0799634,-17.4039545],[-66.0801675,-17.4028469],[-66.0803565,-17.4018998],[-66.0804101,-17.4016681],[-66.0804583,-17.4014777],[-66.0806003,-17.4007274],[-66.0806957,-17.4002913],[-66.0808603,-17.3993443],[-66.0809811,-17.3987465],[-66.0810784,-17.3983144],[-66.0814392,-17.3972545],[-66.0816986,-17.3963944],[-66.0818722,-17.3958815],[-66.0820337,-17.3953684],[-66.0820538,-17.3952637],[-66.0820675,-17.3951555],[-66.0821041,-17.39485],[-66.0820936,-17.3946664],[-66.082027,-17.3941044],[-66.0820305,-17.3940286],[-66.0821465,-17.3938664],[-66.0824848,-17.3934718],[-66.0826136,-17.3932834],[-66.0826504,-17.3931746],[-66.0826568,-17.3930422],[-66.0825774,-17.3925726],[-66.0823682,-17.3911353],[-66.0822351,-17.3902978],[-66.0821345,-17.3897384]],"osmUrl":"https://www.openstreetmap.org/relation/20777813","status":"ok","errorMessage":"","fee":"","onDemand":"","directionLabel":"vuelta","directionId":1}]}]}</script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
 (function () {
@@ -811,15 +889,55 @@
     setTimeout(function () { overviewMap.invalidateSize(); }, 80);
   }
 
-  function toggleSidebar() {
+  function syncChromeHeight() {
+    var chrome = document.querySelector('.top-chrome');
+    if (chrome) {
+      document.documentElement.style.setProperty('--chrome-h', chrome.offsetHeight + 'px');
+    }
+  }
+
+  function isMobileSheet() {
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function updateSidebarUi() {
     var sb = document.getElementById('map-sidebar');
-    sb.classList.toggle('collapsed');
+    var open = !sb.classList.contains('collapsed');
+    document.body.classList.toggle('sidebar-sheet-open', isMobileSheet() && open);
+    document.getElementById('sidebar-backdrop').classList.toggle('visible', isMobileSheet() && open);
+  }
+
+  function toggleSidebar(forceOpen) {
+    var sb = document.getElementById('map-sidebar');
+    if (typeof forceOpen === 'boolean') {
+      sb.classList.toggle('collapsed', !forceOpen);
+    } else {
+      sb.classList.toggle('collapsed');
+    }
+    updateSidebarUi();
     invalidateMap();
   }
 
-  document.getElementById('toggle-sidebar').addEventListener('click', toggleSidebar);
-  document.getElementById('sidebar-toggle-mobile').addEventListener('click', toggleSidebar);
-  window.addEventListener('resize', invalidateMap);
+  document.getElementById('toggle-sidebar').addEventListener('click', function () { toggleSidebar(); });
+  document.getElementById('sidebar-toggle-mobile').addEventListener('click', function () { toggleSidebar(); });
+  document.getElementById('sidebar-backdrop').addEventListener('click', function () { toggleSidebar(false); });
+  document.querySelector('.map-sidebar-head').addEventListener('click', function (e) {
+    if (!isMobileSheet()) return;
+    if (e.target.closest('.map-sidebar-actions')) return;
+    toggleSidebar();
+  });
+
+  if (isMobileSheet()) {
+    document.getElementById('map-sidebar').classList.add('collapsed');
+  }
+  updateSidebarUi();
+
+  window.addEventListener('resize', function () {
+    syncChromeHeight();
+    updateSidebarUi();
+    invalidateMap();
+  });
+  syncChromeHeight();
   setTimeout(invalidateMap, 150);
   setTimeout(invalidateMap, 500);
 })();
