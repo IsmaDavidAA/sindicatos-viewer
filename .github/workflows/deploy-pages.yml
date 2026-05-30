@@ -30,7 +30,10 @@ jobs:
         run: |
           if [ -f input/cochabamba/log.json ]; then
             echo "dir=${{ github.workspace }}/input/cochabamba" >> "$GITHUB_OUTPUT"
-            echo "source=committed input/" >> "$GITHUB_OUTPUT"
+            echo "source=committed input" >> "$GITHUB_OUTPUT"
+          elif [ -f input/cochabamba/out/log.json ]; then
+            echo "dir=${{ github.workspace }}/input/cochabamba/out" >> "$GITHUB_OUTPUT"
+            echo "source=committed input/out" >> "$GITHUB_OUTPUT"
           else
             echo "dir=${{ github.workspace }}/trufi-gtfs-builder/examples/Bolivia-Cochabamba/out" >> "$GITHUB_OUTPUT"
             echo "source=trufi-gtfs-builder" >> "$GITHUB_OUTPUT"
